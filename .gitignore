@@ -1,0 +1,8 @@
+﻿node_modules/
+ui/dist/
+app/bin/
+app/obj/
+dist/
+*.user
+dump*.json*
+probe.txt
