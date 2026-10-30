@@ -91,7 +91,7 @@ internal sealed class Collector : IDisposable
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             new MachineInfo(_machineName, _model, _os, Environment.TickCount64 / 1000, _elevated),
             cpu, gpus, fans, BuildMemory(), BuildBattery(), BuildDisks(), BuildNet(), procInfos, BuildSensors(), notes.ToArray());
-        return snap with { Power = _power.Build(snap, procs, _gpuLuids, PollDiscreteGpu) };
+        return snap with { Power = _power.Build(snap, procs, _gpuLuids, PollDiscreteGpu, PathOf) };
     }
 
     // ---------- CPU ----------
@@ -319,6 +319,16 @@ internal sealed class Collector : IDisposable
         return x.Contains(y) || y.Contains(x) || (x.Contains("radeon") && y.Contains("radeon"));
     }
 
+    private readonly Dictionary<int, string?> _paths = new();
+
+    private string? PathOf(int pid)
+    {
+        if (_paths.TryGetValue(pid, out var p)) return p;
+        try { using var proc = Process.GetProcessById(pid); p = proc.MainModule?.FileName; }
+        catch { p = null; }
+        return _paths[pid] = p;
+    }
+
     private string Describe(int pid)
     {
         if (_descriptions.TryGetValue(pid, out var d)) return d;
@@ -337,6 +347,7 @@ internal sealed class Collector : IDisposable
         if (_descriptions.Count < procs.Count * 2) return;
         var live = procs.Select(p => p.Pid).ToHashSet();
         foreach (var k in _descriptions.Keys.Where(k => !live.Contains(k)).ToList()) _descriptions.Remove(k);
+        foreach (var k in _paths.Keys.Where(k => !live.Contains(k)).ToList()) _paths.Remove(k);
     }
 
     private static T? Wmi<T>(string query, Func<ManagementBaseObject, T> pick)

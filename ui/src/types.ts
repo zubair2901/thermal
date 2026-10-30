@@ -106,11 +106,20 @@ export interface AppPower {
   wh: Nullable<number>;
 }
 
+/** pref: 0 Windows decides, 1 power saving, 2 high performance, null never set. */
+export interface WakeApp {
+  name: string;
+  title: string;
+  path: Nullable<string>;
+  pref: Nullable<number>;
+  packaged: boolean;
+}
+
 export interface PowerInfo {
   onBattery: boolean;
   drainW: Nullable<number>;
   cpuW: Nullable<number>;
-  gpus: { id: string; name: string; kind: string; watts: Nullable<number>; awake: boolean; wakeApps: string[]; wokenByThermal: boolean }[];
+  gpus: { id: string; name: string; kind: string; watts: Nullable<number>; awake: boolean; wakeApps: WakeApp[]; onlyWindows: boolean; wokenByThermal: boolean }[];
   restW: Nullable<number>;
   apps: AppPower[];
   sinceMinutes: number;

@@ -3,7 +3,9 @@ using System.Management;
 namespace Thermal.Telemetry;
 
 public record AppPower(string Name, string Title, double Share, double? Watts, double? CpuW, double? GpuW, double? Wh);
-public record GpuPower(string Id, string Name, string Kind, double? Watts, bool Awake, string[] WakeApps, bool WokenByThermal);
+/// <summary>An app holding the dedicated GPU awake. Pref: 0 Windows decides, 1 power saving, 2 high performance; null = never set.</summary>
+public record WakeApp(string Name, string Title, string? Path, int? Pref, bool Packaged);
+public record GpuPower(string Id, string Name, string Kind, double? Watts, bool Awake, WakeApp[] WakeApps, bool OnlyWindows, bool WokenByThermal);
 public record BatteryHealth(double? DesignWh, double? FullWh, double? WearPct, int? Cycles);
 public record PowerInfo(
     bool OnBattery, double? DrainW, double? CpuW, GpuPower[] Gpus, double? RestW, AppPower[] Apps,
@@ -24,7 +26,7 @@ internal sealed class PowerModel
     private DateTime _healthRead = DateTime.MinValue;
     private readonly int _self = Environment.ProcessId;
 
-    public PowerInfo Build(Snapshot s, List<ProcRow> procs, IReadOnlyDictionary<string, string> luidOfGpuId, bool pollingDgpu)
+    public PowerInfo Build(Snapshot s, List<ProcRow> procs, IReadOnlyDictionary<string, string> luidOfGpuId, bool pollingDgpu, Func<int, string?> pathOf)
     {
         var now = DateTime.UtcNow;
         var dt = Math.Min(5, (now - _last).TotalSeconds);
@@ -48,17 +50,27 @@ internal sealed class PowerModel
             if (g.Power is double gw && sum > 0)
                 foreach (var p in users) gpuShares[p.Pid] = gpuShares.GetValueOrDefault(p.Pid) + gw * p.GpuByLuid[luid] / sum;
 
-            string[] wake = Array.Empty<string>();
+            var wake = Array.Empty<WakeApp>();
+            var onlyWindows = false;
             var awake = true;
             if (g.Kind == "discrete")
             {
                 // On hybrid-graphics laptops the dedicated GPU powers off unless something holds memory or work on it.
-                wake = procs.Where(p => p.Pid != _self && p.Name != "Thermal" && p.Name != "dwm"
-                                        && (p.VramByLuid.GetValueOrDefault(luid) > 0 || p.GpuByLuid.GetValueOrDefault(luid) > 0))
-                    .Select(p => p.Name).Distinct().OrderBy(n => n).ToArray();
-                awake = wake.Length > 0 || pollingDgpu || (g.Power ?? 0) > 1;
+                var holders = procs.Where(p => p.Pid != _self && p.Name != "Thermal"
+                                               && (p.VramByLuid.GetValueOrDefault(luid) > 0 || p.GpuByLuid.GetValueOrDefault(luid) > 0))
+                    .GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                    .Select(grp => (name: grp.Key, path: grp.Select(p => pathOf(p.Pid)).FirstOrDefault(x => x != null), pid: grp.First().Pid))
+                    .ToList();
+                var userApps = holders.Where(h => !GpuPreference.IsSystem(h.name, h.path)).ToList();
+                onlyWindows = userApps.Count == 0 && holders.Count > 0;
+                wake = userApps
+                    .Select(h => new WakeApp(h.name, s.Processes.FirstOrDefault(x => x.Pid == h.pid)?.Title ?? "", h.path,
+                        h.path == null ? null : GpuPreference.Get(h.path), h.path != null && GpuPreference.IsPackaged(h.path)))
+                    .OrderBy(w => w.Title == "" ? w.Name : w.Title, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                awake = holders.Count > 0 || pollingDgpu || (g.Power ?? 0) > 1;
             }
-            gpuRows.Add(new GpuPower(g.Id, g.Name, g.Kind, g.Power, awake, wake, g.Kind == "discrete" && pollingDgpu && wake.Length == 0));
+            gpuRows.Add(new GpuPower(g.Id, g.Name, g.Kind, g.Power, awake, wake, onlyWindows, g.Kind == "discrete" && pollingDgpu && wake.Length == 0 && !onlyWindows));
         }
 
         var gpuW = s.Gpus.Sum(g => g.Power ?? 0);

@@ -1,4 +1,5 @@
 import { num, shortGpu } from "./format";
+import GpuWake from "./GpuWake";
 import type { Snapshot } from "./types";
 
 function hm(minutes: number) {
@@ -13,6 +14,7 @@ export default function Battery({ snap, onReadSensors }: { snap: Snapshot; onRea
   if (!p) return <p className="empty">Power readings start after the first few seconds.</p>;
 
   const dgpu = p.gpus.find((g) => g.kind === "discrete");
+  const igpu = p.gpus.find((g) => g.kind === "integrated");
   const parts = [
     { label: "Processor", w: p.cpuW, cls: "cpu" },
     ...p.gpus.map((g) => ({ label: shortGpu(g.name, snap.cpu.name), w: g.watts, cls: g.kind === "discrete" ? "dgpu" : "igpu" })),
@@ -71,32 +73,7 @@ export default function Battery({ snap, onReadSensors }: { snap: Snapshot; onRea
       )}
 
       {dgpu && (
-        <section className={dgpu.awake && p.onBattery ? "callout hot" : "callout"}>
-          {!dgpu.awake ? (
-            <p>
-              <b>{shortGpu(dgpu.name)} is asleep.</b> Nothing is using it, so it draws no power.
-            </p>
-          ) : dgpu.wakeApps.length > 0 ? (
-            <p>
-              <b>{shortGpu(dgpu.name)} is awake</b>
-              {dgpu.watts != null && <>, drawing {num(dgpu.watts, 1)} W</>}. These apps are keeping it on: <b>{dgpu.wakeApps.join(", ")}</b>.
-              {p.onBattery && " Closing them, or setting them to Power saving in Windows Settings > System > Display > Graphics, lets it power off."}
-            </p>
-          ) : dgpu.wokenByThermal ? (
-            <p>
-              <b>Thermal is keeping {shortGpu(dgpu.name)} awake</b> to read its temperature and clocks. No app needs it right now.{" "}
-              <button className="link" onClick={() => onReadSensors(false)}>
-                Stop reading its sensors
-              </button>{" "}
-              to let it sleep.
-            </p>
-          ) : (
-            <p>
-              <b>{shortGpu(dgpu.name)} is awake</b>
-              {dgpu.watts != null && <>, drawing {num(dgpu.watts, 1)} W</>}.
-            </p>
-          )}
-        </section>
+        <GpuWake gpu={dgpu} igpuName={igpu ? shortGpu(igpu.name, snap.cpu.name) : "integrated GPU"} onBattery={p.onBattery} onReadSensors={onReadSensors} />
       )}
 
       <div className="battery-cols">

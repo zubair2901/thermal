@@ -51,7 +51,7 @@ internal sealed class MainForm : Form
         }
         Controls.Add(_web);
 
-        _tray = new Tray(Icon, ShowMain, ExitApp);
+        _tray = new Tray(Icon!, ShowMain, ExitApp);
         _tray.Overlay.CheckedChanged += (_, _) => { if (_settings.OverlayEnabled != _tray.Overlay.Checked) { _settings.OverlayEnabled = _tray.Overlay.Checked; ApplySettings(); } };
         _tray.Widget.CheckedChanged += (_, _) => { if (_settings.WidgetEnabled != _tray.Widget.Checked) { _settings.WidgetEnabled = _tray.Widget.Checked; ApplySettings(); } };
         _tray.Record.Click += (_, _) => ToggleRecording();
@@ -184,6 +184,30 @@ internal sealed class MainForm : Form
                 var path = root.GetProperty("path").GetString();
                 if (path != null && (path.StartsWith(Recorder.Folder, StringComparison.OrdinalIgnoreCase)))
                     Process.Start(new ProcessStartInfo("explorer.exe", Directory.Exists(path) ? $"\"{path}\"" : $"/select,\"{path}\"") { UseShellExecute = true });
+                break;
+            case "gpuPref":
+            {
+                var p = root.GetProperty("path").GetString()!;
+                string? err = null;
+                try { GpuPreference.Set(p, root.GetProperty("value").GetInt32()); } catch (Exception ex) { err = ex.Message; }
+                Post(new { type = "appAction", name = root.GetProperty("name").GetString(), action = "gpuPref", error = err });
+                break;
+            }
+            case "restartApp":
+            {
+                var n = root.GetProperty("name").GetString()!;
+                var err = GpuPreference.Restart(n, root.GetProperty("path").GetString()!);
+                Post(new { type = "appAction", name = n, action = "restart", error = err });
+                break;
+            }
+            case "closeApp":
+            {
+                var n = root.GetProperty("name").GetString()!;
+                Post(new { type = "appAction", name = n, action = "close", error = GpuPreference.Close(n) });
+                break;
+            }
+            case "graphicsSettings":
+                Process.Start(new ProcessStartInfo("ms-settings:display-advancedgraphics") { UseShellExecute = true });
                 break;
             case "installPawnIO":
                 _ = InstallPawnIo();

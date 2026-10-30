@@ -108,7 +108,7 @@ internal abstract class LayeredWindow : Form
         }
     }
 
-    protected float Scale => DeviceDpi / 96f;
+    protected float UiScale => DeviceDpi / 96f;
 
     protected void Present(Size size, Action<Graphics> draw)
     {
@@ -169,7 +169,7 @@ internal sealed class OverlayWindow : LayeredWindow
 
     public void Update(Snapshot s, Settings settings)
     {
-        var k = Scale * (float)Math.Clamp(settings.OverlayScale, 0.75, 2.0);
+        var k = UiScale * (float)Math.Clamp(settings.OverlayScale, 0.75, 2.0);
         using var label = Look.Font(11 * k, bold: true);
         using var value = Look.Font(16 * k, bold: true);
         using var unit = Look.Font(11 * k);
@@ -322,7 +322,7 @@ internal sealed class WidgetWindow : LayeredWindow
         var p = new Point(_settings.WidgetX, _settings.WidgetY);
         Location = _settings.WidgetX >= 0 && Screen.AllScreens.Any(sc => sc.WorkingArea.Contains(p))
             ? p
-            : new Point(area.Right - (int)(296 * Scale) - 24, area.Top + 24);
+            : new Point(area.Right - (int)(296 * UiScale) - 24, area.Top + 24);
     }
 
     public void Update(Snapshot s)
@@ -340,7 +340,7 @@ internal sealed class WidgetWindow : LayeredWindow
     {
         var s = _last;
         if (s == null) return;
-        var k = Scale;
+        var k = UiScale;
         var size = new Size((int)(296 * k), (int)(232 * k));
         var fmt = StringFormat.GenericTypographic;
         Present(size, g =>

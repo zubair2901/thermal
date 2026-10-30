@@ -96,8 +96,8 @@ function mock(): Snapshot {
       drainW: 24.6,
       cpuW: 9.8,
       gpus: [
-        { id: "nv", name: "NVIDIA GeForce RTX 4060 Laptop GPU", kind: "discrete", watts: 6.1, awake: true, wakeApps: ["steamwebhelper", "Discord"], wokenByThermal: false },
-        { id: "amd", name: "AMD Radeon(TM) Graphics", kind: "integrated", watts: 3.2, awake: true, wakeApps: [], wokenByThermal: false },
+        { id: "nv", name: "NVIDIA GeForce RTX 4060 Laptop GPU", kind: "discrete", watts: 6.1, awake: true, wakeApps: [{ name: "chatgpt", title: "ChatGPT", path: "C:\\Program Files\\WindowsApps\\OpenAI.ChatGPT\\ChatGPT.exe", pref: null, packaged: true }, { name: "Discord", title: "Discord", path: "C:\\Users\\you\\AppData\\Local\\Discord\\app-1.0\\Discord.exe", pref: null, packaged: false }, { name: "slack", title: "Slack", path: "C:\\Users\\you\\AppData\\Local\\slack\\slack.exe", pref: 1, packaged: false }], onlyWindows: false, wokenByThermal: false },
+        { id: "amd", name: "AMD Radeon(TM) Graphics", kind: "integrated", watts: 3.2, awake: true, wakeApps: [], onlyWindows: false, wokenByThermal: false },
       ],
       restW: 5.5,
       apps: [
