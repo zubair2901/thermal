@@ -111,8 +111,10 @@ export interface WakeApp {
   name: string;
   title: string;
   path: Nullable<string>;
+  appId: Nullable<string>;
   pref: Nullable<number>;
   packaged: boolean;
+  nvidia: boolean;
 }
 
 export interface PowerInfo {

@@ -11,13 +11,16 @@ function WakeRow({ app, igpuName, result }: { app: WakeApp; igpuName: string; re
   const [confirm, setConfirm] = useState<"restart" | "close" | null>(null);
   const label = app.title || app.name;
   const set = app.pref === 1 || result?.done === "gpuPref";
+  // Store apps are set by app ID; if Windows didn't give us one, fall back to its Settings page.
+  const canSet = !!app.path && !app.nvidia && (!app.packaged || !!app.appId);
 
   let status = "";
   if (result?.error) status = result.error;
   else if (result?.done === "restart") status = `Restarted. It now opens on the ${igpuName}.`;
   else if (result?.done === "close") status = "Closed.";
+  else if (app.nvidia) status = "Part of the NVIDIA App. Turning off its in-game overlay (NVIDIA App > Settings > Features) lets the GPU sleep.";
   else if (set) status = `Set to power saving. It moves to the ${igpuName} the next time it starts.`;
-  else if (app.packaged) status = "A Microsoft Store app. Change it in Windows graphics settings.";
+  else if (!canSet) status = "Windows didn't report this app's ID. Add it under Microsoft Store apps in Windows graphics settings.";
 
   return (
     <li className="wake">
@@ -35,7 +38,7 @@ function WakeRow({ app, igpuName, result }: { app: WakeApp; igpuName: string; re
             <button
               className="danger"
               onClick={() => {
-                send(confirm === "restart" ? { type: "restartApp", name: app.name, path: app.path } : { type: "closeApp", name: app.name });
+                send(confirm === "restart" ? { type: "restartApp", name: app.name, path: app.path, appId: app.appId } : { type: "closeApp", name: app.name });
                 setConfirm(null);
               }}
             >
@@ -45,17 +48,17 @@ function WakeRow({ app, igpuName, result }: { app: WakeApp; igpuName: string; re
           </>
         ) : (
           <>
-            {app.packaged ? (
-              <button onClick={() => send({ type: "graphicsSettings" })}>Open graphics settings</button>
-            ) : (
-              !set &&
-              app.path && (
-                <button className="primary" disabled={!isNative} onClick={() => send({ type: "gpuPref", name: app.name, path: app.path, value: 1 })}>
-                  Use power-saving GPU
-                </button>
-              )
+            {canSet && !set && (
+              <button
+                className="primary"
+                disabled={!isNative}
+                onClick={() => send({ type: "gpuPref", name: app.name, path: app.path, appId: app.appId, value: 1 })}
+              >
+                Use power-saving GPU
+              </button>
             )}
-            {set && app.path && !app.packaged && result?.done !== "restart" && (
+            {!canSet && !app.nvidia && <button onClick={() => send({ type: "graphicsSettings" })}>Open graphics settings</button>}
+            {canSet && set && result?.done !== "restart" && (
               <button className="primary" disabled={!isNative} onClick={() => setConfirm("restart")}>
                 Restart it now
               </button>

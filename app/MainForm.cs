@@ -187,16 +187,16 @@ internal sealed class MainForm : Form
                 break;
             case "gpuPref":
             {
-                var p = root.GetProperty("path").GetString()!;
+                var key = AppId(root) ?? root.GetProperty("path").GetString()!;
                 string? err = null;
-                try { GpuPreference.Set(p, root.GetProperty("value").GetInt32()); } catch (Exception ex) { err = ex.Message; }
+                try { GpuPreference.Set(key, root.GetProperty("value").GetInt32()); } catch (Exception ex) { err = ex.Message; }
                 Post(new { type = "appAction", name = root.GetProperty("name").GetString(), action = "gpuPref", error = err });
                 break;
             }
             case "restartApp":
             {
                 var n = root.GetProperty("name").GetString()!;
-                var err = GpuPreference.Restart(n, root.GetProperty("path").GetString()!);
+                var err = GpuPreference.Restart(n, root.GetProperty("path").GetString()!, AppId(root));
                 Post(new { type = "appAction", name = n, action = "restart", error = err });
                 break;
             }
@@ -218,6 +218,9 @@ internal sealed class MainForm : Form
                 break;
         }
     }
+
+    private static string? AppId(JsonElement root) =>
+        root.TryGetProperty("appId", out var id) && id.GetString() is { Length: > 0 } s ? s : null;
 
     private void Post(object msg)
     {

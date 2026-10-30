@@ -4,7 +4,7 @@ namespace Thermal.Telemetry;
 
 public record AppPower(string Name, string Title, double Share, double? Watts, double? CpuW, double? GpuW, double? Wh);
 /// <summary>An app holding the dedicated GPU awake. Pref: 0 Windows decides, 1 power saving, 2 high performance; null = never set.</summary>
-public record WakeApp(string Name, string Title, string? Path, int? Pref, bool Packaged);
+public record WakeApp(string Name, string Title, string? Path, string? AppId, int? Pref, bool Packaged, bool Nvidia);
 public record GpuPower(string Id, string Name, string Kind, double? Watts, bool Awake, WakeApp[] WakeApps, bool OnlyWindows, bool WokenByThermal);
 public record BatteryHealth(double? DesignWh, double? FullWh, double? WearPct, int? Cycles);
 public record PowerInfo(
@@ -65,8 +65,16 @@ internal sealed class PowerModel
                 var userApps = holders.Where(h => !GpuPreference.IsSystem(h.name, h.path)).ToList();
                 onlyWindows = userApps.Count == 0 && holders.Count > 0;
                 wake = userApps
-                    .Select(h => new WakeApp(h.name, s.Processes.FirstOrDefault(x => x.Pid == h.pid)?.Title ?? "", h.path,
-                        h.path == null ? null : GpuPreference.Get(h.path), h.path != null && GpuPreference.IsPackaged(h.path)))
+                    .Select(h =>
+                    {
+                        // Store apps are keyed by app ID in the GPU preference store, desktop apps by exe path.
+                        var packaged = h.path != null && GpuPreference.IsPackaged(h.path);
+                        var appId = packaged ? GpuPreference.AppIdOf(h.pid) : null;
+                        var key = appId ?? h.path;
+                        return new WakeApp(h.name, s.Processes.FirstOrDefault(x => x.Pid == h.pid)?.Title ?? "", h.path, appId,
+                            key == null ? null : GpuPreference.Get(key), packaged,
+                            h.path != null && h.path.Contains("NVIDIA Corporation", StringComparison.OrdinalIgnoreCase));
+                    })
                     .OrderBy(w => w.Title == "" ? w.Name : w.Title, StringComparer.OrdinalIgnoreCase)
                     .ToArray();
                 awake = holders.Count > 0 || pollingDgpu || (g.Power ?? 0) > 1;
