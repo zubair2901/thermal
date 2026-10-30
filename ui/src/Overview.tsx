@@ -68,6 +68,9 @@ function CpuInstrument({ snap, history }: { snap: Snapshot; history: Map<string,
 function GpuInstrument({ g, snap, history }: { g: Gpu; snap: Snapshot; history: Map<string, Series> }) {
   const fan = g.fanRpm ?? (g.kind === "discrete" ? snap.fans.find((f) => /gpu/i.test(f.name))?.rpm ?? null : null);
   const memPct = g.memUsed != null && g.memTotal ? (100 * g.memUsed) / g.memTotal : null;
+  // Thermal reads all GPU temperatures over one connection, which it keeps closed while no app uses the dedicated GPU.
+  const dgpu = snap.gpus.find((x) => x.kind === "discrete");
+  const paused = g.kind === "integrated" && g.temp == null && !snap.gpuSensorsConnected && !!dgpu;
   return (
     <section className={g.active ? "inst" : "inst asleep"} aria-label={g.name}>
       <h2>
@@ -75,7 +78,20 @@ function GpuInstrument({ g, snap, history }: { g: Gpu; snap: Snapshot; history: 
         <span className="kind">{g.kind === "discrete" ? "dedicated" : "integrated"}</span>
       </h2>
       <div className="inst-top">
-        <Temp c={g.temp} missing={g.kind === "discrete" && !g.active ? "Asleep" : "No reading"} />
+        <Temp
+          c={g.temp}
+          missing={
+            g.kind === "discrete"
+              ? !g.active
+                ? "Asleep"
+                : !snap.gpuSensorsConnected
+                  ? "Not in use"
+                  : "No temp sensor"
+              : paused
+                ? "Temp paused"
+                : "No temp sensor"
+          }
+        />
         <div className="load">
           <span className="load-n" style={{ color: heat(scale.pct(g.load)) }}>{num(g.load)}%</span>
           <span className="load-l">load</span>
@@ -87,7 +103,9 @@ function GpuInstrument({ g, snap, history }: { g: Gpu; snap: Snapshot; history: 
             ? g.active
               ? "Sensors connect while an app uses it"
               : "Asleep, drawing no power"
-            : "Sensors connect while the dedicated GPU is in use"
+            : paused
+              ? `Paused while no app uses the ${shortGpu(dgpu!.name, snap.cpu.name)}, so it can sleep. This GPU shares the CPU die, so the CPU temperature is a close guide.`
+              : "This GPU doesn't report a temperature"
           : g.hotspot != null
             ? `Hot spot ${Math.round(g.hotspot)} °C`
             : "Measured at the GPU core"}

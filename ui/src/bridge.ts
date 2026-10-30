@@ -91,6 +91,7 @@ function mock(): Snapshot {
     notes: [{ id: "pawnio", text: "CPU die temperature and package power need the PawnIO driver, a small signed driver that sensor tools use to read the processor. Without it the temperature shown is an estimate.", action: "installPawnIO" }],
     fps: phase % 40 < 25 ? { pid: 4412, name: "cyberpunk2077", fps: wave(4, 88, 40), frameTimeMs: 8.4, low1: 71 } : null,
     recording: null,
+    gpuSensorsConnected: true,
     power: {
       onBattery: true,
       drainW: 24.6,

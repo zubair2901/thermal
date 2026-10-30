@@ -94,6 +94,8 @@ export interface Snapshot {
   fps: Nullable<{ pid: number; name: string; fps: number; frameTimeMs: number; low1: Nullable<number> }>;
   recording: Nullable<Recording>;
   power: Nullable<PowerInfo>;
+  /** False while Thermal is disconnected from GPU sensors so the dedicated GPU can sleep. */
+  gpuSensorsConnected: boolean;
 }
 
 export interface AppPower {

@@ -117,7 +117,7 @@ internal sealed class Collector : IDisposable
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             new MachineInfo(_machineName, _model, _os, Environment.TickCount64 / 1000, _elevated),
             cpu, gpus, fans, BuildMemory(), BuildBattery(), BuildDisks(), BuildNet(), procInfos, BuildSensors(), notes.ToArray());
-        return snap with { Power = _power.Build(snap, procs, _gpuLuids, _dgpuOn, _gpuOpen && UsersOfDgpu(procs).Count == 0, PathOf) };
+        return snap with { GpuSensorsConnected = _gpuOpen, Power = _power.Build(snap, procs, _gpuLuids, _dgpuOn, _gpuOpen && UsersOfDgpu(procs).Count == 0, PathOf) };
     }
 
     /// <summary>Apps (not Windows itself, not Thermal) holding real work or memory on the dedicated GPU.</summary>
