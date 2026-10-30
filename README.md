@@ -32,7 +32,7 @@ Prefer not to install anything? **[Thermal.exe](../../releases/latest/download/T
 These commands work in PowerShell. An assistant such as Claude Code can run them too, but a person still has to approve the administrator prompt.
 
 ```powershell
-$setup = "$env:TEMPThermal-Setup.exe"
+$setup = "$env:TEMP\Thermal-Setup.exe"
 Invoke-WebRequest https://github.com/zubair2901/thermal/releases/latest/download/Thermal-Setup.exe -OutFile $setup
 Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Verb RunAs -Wait
 ```

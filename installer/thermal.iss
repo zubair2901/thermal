@@ -18,7 +18,8 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist
-OutputBaseFilename=Thermal-Setup-{#AppVersion}
+; A fixed name, so releases/latest/download/Thermal-Setup.exe always points at the newest installer.
+OutputBaseFilename=Thermal-Setup
 SetupIconFile=..\app\thermal.ico
 UninstallDisplayIcon={app}\Thermal.exe
 Compression=lzma2/max
