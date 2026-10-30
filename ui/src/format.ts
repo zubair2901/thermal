@@ -57,12 +57,18 @@ export function uptime(s: number): string {
   return d ? `${d}d ${h}h ${m}m` : `${h}h ${m}m`;
 }
 
-export function shortGpu(name: string): string {
+export function shortGpu(name: string, cpuName = ""): string {
+  // AMD reports every APU as "Radeon Graphics"; the CPU name carries the model ("w/ Radeon 780M Graphics").
+  if (/Radeon\(TM\) Graphics|^AMD Radeon Graphics$/i.test(name)) {
+    const m = cpuName.match(/Radeon\s+(\d{3,4}M)/i);
+    return m ? `Radeon ${m[1]}` : "Radeon Graphics";
+  }
   return name
     .replace(/NVIDIA GeForce /i, "")
     .replace(/ Laptop GPU/i, "")
-    .replace(/AMD Radeon\(TM\) Graphics/i, "Radeon 780M")
-    .replace(/\(TM\)|\(R\)/g, "");
+    .replace(/\(TM\)|\(R\)/g, "")
+    .replace(/^(Intel|AMD) /, "")
+    .trim();
 }
 
 export function shortCpu(name: string): string {

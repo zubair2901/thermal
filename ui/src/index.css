@@ -797,6 +797,362 @@ h3 {
   margin-bottom: 4px;
 }
 
+/* ---------- Notes with actions ---------- */
+
+.notes li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.notes li.ok {
+  color: #9fd3a8;
+}
+
+.note-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+button.primary {
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 14px;
+  background: var(--cool);
+  color: #0e1520;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button.primary:hover {
+  filter: brightness(1.08);
+}
+
+button.primary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+button.primary.stop {
+  background: var(--hot);
+  color: #fff;
+}
+
+.switch small {
+  margin-left: auto;
+  color: var(--text-3);
+}
+
+.rec-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 8px;
+  border-radius: 50%;
+  background: var(--hot);
+  vertical-align: middle;
+}
+
+/* ---------- Game strip ---------- */
+
+.game {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: var(--text-2);
+}
+
+.game b {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.game-fps {
+  font-size: var(--step-3);
+  font-weight: 500;
+  font-variation-settings: "wdth" 70;
+  color: var(--text);
+  line-height: 1;
+}
+
+/* ---------- Settings ---------- */
+
+.settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 30px 40px;
+  max-width: 1100px;
+}
+
+.settings section {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.lead {
+  color: var(--text-2);
+  max-width: 70ch;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.row > span {
+  display: grid;
+}
+
+.row > span small {
+  margin-top: 2px;
+}
+
+.row input[type="checkbox"],
+.items input {
+  accent-color: var(--cool);
+  width: 16px;
+  height: 16px;
+  flex: none;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.row.num span {
+  min-width: 110px;
+}
+
+.row input[type="number"],
+.row select {
+  background: var(--ink-1);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 8px;
+}
+
+.row input[type="number"] {
+  width: 80px;
+}
+
+.row input[type="range"] {
+  accent-color: var(--cool);
+  width: 180px;
+}
+
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.seg button {
+  background: none;
+  border: 0;
+  padding: 5px 10px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.seg button + button {
+  border-left: 1px solid var(--line);
+}
+
+.seg button[aria-checked="true"] {
+  background: var(--ink-2);
+  color: var(--text);
+}
+
+fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
+
+.items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+}
+
+.warn {
+  color: var(--warm);
+}
+
+.version {
+  color: var(--text-3);
+  font-size: var(--step--1);
+  grid-column: 1 / -1;
+}
+
+/* ---------- Sessions ---------- */
+
+.sessions {
+  display: grid;
+  gap: 16px;
+  max-width: 1000px;
+}
+
+.rec {
+  color: var(--hot);
+  font-weight: 600;
+}
+
+.summary td:first-child {
+  min-width: 220px;
+}
+
+/* ---------- Battery ---------- */
+
+.battery {
+  display: grid;
+  gap: 24px;
+  max-width: 1200px;
+}
+
+.drain-n {
+  font-size: var(--step-5);
+  font-weight: 300;
+  font-variation-settings: "wdth" 62;
+  line-height: 0.95;
+}
+
+.drain-n small {
+  font-size: var(--step-2);
+}
+
+.drain-n.small {
+  font-size: var(--step-3);
+  font-weight: 600;
+  font-variation-settings: "wdth" 100;
+}
+
+.drain-l {
+  color: var(--text-2);
+  margin-top: 6px;
+}
+
+.split {
+  display: flex;
+  height: 14px;
+  gap: 2px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.split span {
+  flex-basis: 0;
+  min-width: 3px;
+}
+
+.cpu {
+  background: #4fa3d9;
+}
+
+.igpu {
+  background: #3f6f93;
+}
+
+.dgpu {
+  background: #f0b03f;
+}
+
+.rest {
+  background: #5f6a80;
+}
+
+.split-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 26px;
+}
+
+.split-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-2);
+}
+
+.split-legend i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.split-legend b {
+  color: var(--text);
+}
+
+.callout {
+  padding: 12px 16px;
+  border-left: 3px solid var(--cool);
+  background: rgba(79, 163, 217, 0.08);
+  border-radius: 0 6px 6px 0;
+  max-width: 110ch;
+}
+
+.callout.hot {
+  border-left-color: var(--warm);
+  background: rgba(240, 176, 63, 0.08);
+}
+
+.callout b {
+  font-weight: 600;
+}
+
+.battery-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 32px;
+}
+
+.app-cell {
+  position: relative;
+  min-width: 220px;
+}
+
+.app-bar {
+  position: absolute;
+  left: 0;
+  top: 3px;
+  bottom: 3px;
+  background: rgba(240, 176, 63, 0.16);
+  border-radius: 3px;
+}
+
+.app-name {
+  position: relative;
+}
+
+.stats.health {
+  grid-template-columns: repeat(4, minmax(0, 200px));
+}
+
+.muted {
+  color: var(--text-2);
+}
+
+.footnote {
+  color: var(--text-3);
+  font-size: var(--step--1);
+  max-width: 90ch;
+}
 @media (max-width: 900px) {
   .shell {
     grid-template-columns: 1fr;

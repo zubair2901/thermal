@@ -90,5 +90,79 @@ export interface Snapshot {
   net: { name: string; up: number; down: number }[];
   processes: Proc[];
   sensors: Sensor[];
-  notes: string[];
+  notes: Note[];
+  fps: Nullable<{ pid: number; name: string; fps: number; frameTimeMs: number; low1: Nullable<number> }>;
+  recording: Nullable<Recording>;
+  power: Nullable<PowerInfo>;
+}
+
+export interface AppPower {
+  name: string;
+  title: string;
+  share: number;
+  watts: Nullable<number>;
+  cpuW: Nullable<number>;
+  gpuW: Nullable<number>;
+  wh: Nullable<number>;
+}
+
+export interface PowerInfo {
+  onBattery: boolean;
+  drainW: Nullable<number>;
+  cpuW: Nullable<number>;
+  gpus: { id: string; name: string; kind: string; watts: Nullable<number>; awake: boolean; wakeApps: string[]; wokenByThermal: boolean }[];
+  restW: Nullable<number>;
+  apps: AppPower[];
+  sinceMinutes: number;
+  sinceWh: Nullable<number>;
+  sinceApps: AppPower[];
+  health: Nullable<{ designWh: Nullable<number>; fullWh: Nullable<number>; wearPct: Nullable<number>; cycles: Nullable<number> }>;
+}
+
+export interface Note {
+  id: string;
+  text: string;
+  action: Nullable<string>;
+}
+
+export interface MetricSummary {
+  key: string;
+  label: string;
+  unit: string;
+  min: Nullable<number>;
+  avg: Nullable<number>;
+  max: Nullable<number>;
+}
+
+export interface Recording {
+  active: boolean;
+  startedAt: number;
+  seconds: number;
+  path: Nullable<string>;
+  summary: MetricSummary[];
+}
+
+export interface Settings {
+  pollDgpu: boolean;
+  overlayEnabled: boolean;
+  overlayHotkey: string;
+  overlayCorner: "top-left" | "top-right" | "bottom-left" | "bottom-right";
+  overlayScale: number;
+  overlayItems: string[];
+  widgetEnabled: boolean;
+  widgetOnTop: boolean;
+  alertsEnabled: boolean;
+  cpuTempAlert: number;
+  gpuTempAlert: number;
+  alertSeconds: number;
+  closeToTray: boolean;
+  startWithWindows: boolean;
+  trayTemperature: boolean;
+}
+
+export interface HostInfo {
+  settings: Settings;
+  fpsAvailable: boolean;
+  sessionsFolder: string;
+  version: string;
 }

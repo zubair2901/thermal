@@ -1,53 +1,78 @@
 # Thermal
 
-A performance monitor for Windows laptops, built for the HP Victus 15 (Ryzen 7 8845HS, RTX 4060 Laptop, Radeon 780M). It shows what Task Manager leaves out: temperatures, fan speeds, both GPUs side by side, and which app is using which GPU.
+A hardware monitor for Windows laptops. It shows temperatures, fan speeds, both GPUs side by side, which app is using which GPU, where your battery is going, and a frame-rate overlay for games.
 
-![icon](ui/public/icon.png)
+It was built on an HP Victus 15 (Ryzen 7 8845HS, RTX 4060 Laptop, Radeon 780M) and works on any Windows 10 or 11 PC. HP laptops get fan speeds through the HP BIOS; other machines get whatever fan sensors LibreHardwareMonitor can see.
+
+![Thermal overview](docs/overview.jpg)
+
+| Desktop widget | Game overlay |
+| --- | --- |
+| ![Widget](docs/widget.jpg) | ![Overlay](docs/overlay.jpg) |
+
+## Install
+
+Download from [Releases](../../releases):
+
+- **Thermal-Setup-x.y.z.exe** installs Thermal with a Start menu shortcut and an uninstaller.
+- **Thermal.exe** is the same app as a single portable file.
+
+Thermal asks for administrator rights when it starts. Fan speeds, CPU temperature and the frame-rate counter all need them.
+
+Windows SmartScreen may say "Windows protected your PC" the first time, because the app isn't code-signed yet. Choose **More info**, then **Run anyway**.
+
+### CPU temperature and power on AMD and Intel
+
+LibreHardwareMonitor reads the CPU die temperature and package power through the [PawnIO](https://pawnio.eu) driver. If it isn't installed, Thermal shows an **Install PawnIO** button (it runs `winget install namazso.PawnIO`) and uses an approximate temperature until then.
 
 ## What it shows
 
-- **CPU**: die temperature, total and per-thread load, clock, package power, CPU fan speed
-- **Both GPUs**: temperature, hot spot, load per engine (3D, copy, video decode/encode), core clock, power, VRAM or shared memory, GPU fan speed
-- **Fans**: CPU and GPU fan RPM, read from the HP BIOS (the generic sensor libraries can't see these fans)
-- **Memory**: in use, committed, file cache, and the apps holding the most
-- **Processes**: CPU, memory (private working set), GPU load and which GPU/engine, GPU memory, disk I/O, threads; group by app, sort, filter, end task
-- **Storage, network, battery**: SSD temperature and throughput, Wi-Fi up/down, charge and charge/discharge rate
-- **Last five minutes**: a heat ribbon with one row per sensor
-- **All sensors**: every reading LibreHardwareMonitor exposes, with min and max
+- **Overview**: CPU and each GPU with temperature, load, clocks, power and fan speed; load per CPU thread; GPU load per engine (3D, copy, video); VRAM; a five-minute heat history of every sensor; memory, storage, network and the apps doing the most work.
+- **Processes**: CPU, memory, GPU load and which GPU it runs on, GPU memory, disk I/O and threads per app. Group by app, sort, filter, end task.
+- **Battery**: current drain in watts and time left; how the power splits between CPU, each GPU and the rest of the laptop; estimated watts per app; energy each app used since you unplugged; which apps keep the dedicated GPU awake; battery wear and charge cycles.
+- **All sensors**: every reading LibreHardwareMonitor exposes, with lowest and highest values.
+- **Sessions**: record a game or workload to CSV, one row per second, and see lowest, average and highest for each reading.
 
-## Running it
+Windows doesn't measure power per app, so Thermal splits the measured CPU and GPU power between apps by their share of processor and graphics time. Treat per-app watts as estimates.
 
-`dist/Thermal.exe` is a single self-contained file (no .NET install needed). It asks for administrator rights when it starts, because the fan readings (HP BIOS WMI) and CPU sensors need them. WebView2 is already part of Windows 11.
+## Overlay, widget, alerts and tray
 
-### CPU temperature and power
-
-On Ryzen, LibreHardwareMonitor reads the die temperature and package power through the PawnIO driver. Without it, Thermal falls back to the ACPI thermal zone and shows a note. To get exact readings, run this once in an administrator terminal, then restart Thermal:
-
-```
-winget install namazso.PawnIO
-```
-
-### The "Read RTX sensors" switch
-
-Reading the RTX 4060's sensors through NVAPI keeps it awake. On battery, turn the switch off so the GPU can power down; load and per-app GPU usage still come from Windows' own counters.
+- **Game overlay**: click-through readout of frame rate (with 1% low and frame time), CPU, GPU, VRAM, fans, memory and battery. Toggle it with **Ctrl+Shift+O**, or choose another shortcut, corner, size and lines in Settings. It shows over windowed and borderless games; games in exclusive fullscreen hide every overlay, including this one.
+- **Frame rate** comes from the DXGI and Direct3D 9 present events (the same ETW events PresentMon reads), for whichever app is in the foreground. It covers DirectX 9 to 12 games, and Vulkan or OpenGL games that present through DXGI.
+- **Desktop widget**: drag it anywhere, right-click for options, double-click to open Thermal.
+- **Alerts**: a Windows notification when the CPU or a GPU stays above its limit (95 °C and 87 °C for 30 seconds by default), naming the busiest app.
+- **Tray**: the tray icon shows the CPU temperature. Closing the window keeps Thermal running in the tray; right-click the icon and choose **Exit** to quit. **Start with Windows** adds a logon task, so Thermal starts in the tray without an administrator prompt.
+- **Read the dedicated GPU's sensors**: reading the RTX through NVAPI keeps it awake. Turn this off on battery and the GPU can sleep; load and per-app GPU use still come from Windows' own counters.
 
 ## How it's built
 
 | Part | Where | What |
 | --- | --- | --- |
-| Host | `app/` | .NET 8 WinForms window with WebView2. Serves the UI from embedded resources and posts a JSON snapshot every second. |
-| Sensors | `app/Telemetry/Collector.cs` | LibreHardwareMonitorLib for CPU, GPU, storage, network and battery sensors. |
-| Fans | `app/Telemetry/HpBios.cs` | HP `hpqBIntM` WMI BIOS calls (command codes from the OmenMon project). |
-| Per-app GPU | `app/Telemetry/Counters.cs`, `Dxgi.cs` | "GPU Engine" and "GPU Process Memory" performance counters, mapped to adapter names through DXGI LUIDs. |
-| UI | `ui/` | React + TypeScript + Vite. Canvas traces and the heat ribbon are drawn by hand; Archivo variable font (condensed widths for numerals). |
+| Host | `app/MainForm.cs` | .NET 8 WinForms window with WebView2. Serves the UI from embedded resources and sends a JSON snapshot every second. |
+| Sensors | `app/Telemetry/Collector.cs` | LibreHardwareMonitorLib for CPU, GPU, storage, network and battery. |
+| HP fans | `app/Telemetry/HpBios.cs` | HP `hpqBIntM` WMI BIOS calls, following the OmenMon project's notes. |
+| Per-app GPU | `app/Telemetry/Counters.cs`, `Dxgi.cs` | "GPU Engine" and "GPU Process Memory" performance counters, mapped to adapters through DXGI LUIDs. |
+| Frame rate | `app/Telemetry/Fps.cs` | Real-time ETW session on the DXGI and D3D9 providers. |
+| Battery | `app/Telemetry/Power.cs` | Per-app power attribution, energy since unplugged, battery health from WMI. |
+| Sessions, alerts | `app/Telemetry/Recorder.cs`, `Alerts.cs` | CSV logging with min/avg/max; sustained-temperature notifications. |
+| Overlay, widget, tray | `app/Hud.cs`, `app/Tray.cs` | Native layered windows drawn with GDI+, so they cost little while gaming. |
+| UI | `ui/` | React, TypeScript and Vite. Charts are drawn on canvas; Archivo variable font. |
 
 ### Build
 
+Requirements: Node 20+, .NET 8 SDK.
+
 ```
-cd ui && npm install && npm run build
+cd ui && npm ci && npm run build
 cd ../app && dotnet publish -c Release -o ../dist
 ```
 
-`npm run dev` in `ui/` runs the interface in a browser with synthetic data. To point the desktop window at the dev server, set `THERMAL_DEV_URL=http://localhost:5179`. `THERMAL_DEVTOOLS=1` enables the WebView2 inspector.
+The installer is built with [Inno Setup](https://jrsoftware.org/isinfo.php): `iscc installer/thermal.iss`. Pushing a `v*` tag runs `.github/workflows/release.yml`, which builds both and attaches them to the GitHub release.
 
-`Thermal.exe --dump out.json` takes three readings and writes them to a file, which helps when a sensor is missing. Errors are logged to `%LOCALAPPDATA%\Thermal\error.log`.
+`npm run dev` in `ui/` runs the interface in a browser with synthetic data. `THERMAL_DEV_URL=http://localhost:5179` points the desktop window at the dev server, and `THERMAL_DEVTOOLS=1` enables the WebView2 inspector. `Thermal.exe --dump out.json` writes three readings to a file, which helps when a sensor is missing.
+
+Settings live in `%APPDATA%\Thermal\settings.json`, logs in `%LOCALAPPDATA%\Thermal`, and recorded sessions in `Documents\Thermal sessions`.
+
+## License
+
+MIT. See [LICENSE](LICENSE) and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

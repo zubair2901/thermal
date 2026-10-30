@@ -1,4 +1,4 @@
-﻿namespace Thermal;
+namespace Thermal;
 
 internal static class Program
 {
@@ -12,13 +12,25 @@ internal static class Program
             Telemetry.Snapshot? s = null;
             for (var i = 0; i < 3; i++) { s = c.Collect(); Thread.Sleep(1000); }
             File.WriteAllText(args[1], System.Text.Json.JsonSerializer.Serialize(s, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web) { WriteIndented = true }));
-            using var hp = new Telemetry.HpBios();
-            File.WriteAllLines(args[1] + ".hp.txt", new[] { hp.Probe(0x23, 4, 1), hp.Probe(0x23, 4, 0), hp.Probe(0x23, 128, 1), hp.Probe(0x2D, 128, 0), hp.Probe(0x2C, 128, 0), hp.Probe(0x10, 4, 0) });
             return;
         }
+
+        // One instance only: a second launch asks the running one to show its window.
+        using var mutex = new Mutex(true, @"Local\Thermal.SingleInstance", out var first);
+        using var showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\Thermal.Show");
+        if (!first)
+        {
+            showSignal.Set();
+            return;
+        }
+
         Application.ThreadException += (_, e) => MainForm.Log(e.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => { if (e.ExceptionObject is Exception ex) MainForm.Log(ex); };
+        TaskScheduler.UnobservedTaskException += (_, e) => MainForm.Log(e.Exception);
+        MainForm.Trace($"start {Application.ProductVersion} args={string.Join(" ", args)}");
         ApplicationConfiguration.Initialize();
-        Application.Run(new MainForm());
+        var form = new MainForm(startHidden: args.Contains("--tray"));
+        new Thread(() => { while (showSignal.WaitOne()) form.ShowMain(); }) { IsBackground = true }.Start();
+        Application.Run(form);
     }
 }

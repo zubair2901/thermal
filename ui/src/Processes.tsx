@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { isNative, listen, send } from "./bridge";
-import { bytes, heat, num, rate, shortGpu } from "./format";
+import { bytes, heat, num, rate, shortGpu as gpuShort } from "./format";
 import type { Proc, Snapshot } from "./types";
 
 type Key = "name" | "cpu" | "ram" | "gpu" | "vram" | "io" | "threads";
@@ -19,7 +19,8 @@ interface Row {
   threads: number;
 }
 
-function group(procs: Proc[], byApp: boolean): Row[] {
+function group(procs: Proc[], byApp: boolean, cpuName: string): Row[] {
+  const shortGpu = (n: string) => gpuShort(n, cpuName);
   if (!byApp)
     return procs.map((p) => ({
       id: String(p.pid),
@@ -88,23 +89,25 @@ export default function Processes({ snap }: { snap: Snapshot }) {
   const [message, setMessage] = useState<string | null>(null);
   const [frozen, setFrozen] = useState<Proc[] | null>(null);
 
-  useEffect(() => {
-    listen<{ pid: number; error: string | null }>("killResult", (r) => {
-      setMessage(r.error ? `Could not end process ${r.pid}: ${r.error}` : `Ended process ${r.pid}.`);
-    });
-  }, []);
+  useEffect(
+    () =>
+      listen<{ pid: number; error: string | null }>("killResult", (r) => {
+        setMessage(r.error ? `Could not end process ${r.pid}: ${r.error}` : `Ended process ${r.pid}.`);
+      }),
+    [],
+  );
 
   const procs = frozen ?? snap.processes;
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const list = group(procs, byApp).filter((r) => !needle || r.name.toLowerCase().includes(needle) || r.exe.toLowerCase().includes(needle));
+    const list = group(procs, byApp, snap.cpu.name).filter((r) => !needle || r.name.toLowerCase().includes(needle) || r.exe.toLowerCase().includes(needle));
     const dir = sort.desc ? -1 : 1;
     return list.sort((a, b) => {
       const x = a[sort.key];
       const y = b[sort.key];
       return typeof x === "string" ? dir * x.localeCompare(y as string) : dir * ((x as number) - (y as number));
     });
-  }, [procs, byApp, q, sort]);
+  }, [procs, byApp, q, sort, snap.cpu.name]);
 
   const totals = useMemo(
     () => ({

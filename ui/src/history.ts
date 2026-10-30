@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { subscribe } from "./bridge";
+import { shortGpu } from "./format";
 import type { Snapshot } from "./types";
 
 export const WINDOW = 300; // seconds kept in memory and shown in the ribbon
@@ -17,8 +18,8 @@ function extract(s: Snapshot): { key: string; label: string; unit: string; kind:
   out.push({ key: "cpu.temp", label: "CPU temperature", unit: "°C", kind: "temp", v: s.cpu.temp });
   out.push({ key: "cpu.load", label: "CPU load", unit: "%", kind: "pct", v: s.cpu.load });
   s.gpus.forEach((g) => {
-    out.push({ key: `${g.id}.temp`, label: `${g.name} temperature`, unit: "°C", kind: "temp", v: g.temp });
-    out.push({ key: `${g.id}.load`, label: `${g.name} load`, unit: "%", kind: "pct", v: g.load });
+    out.push({ key: `${g.id}.temp`, label: `${shortGpu(g.name, s.cpu.name)} temperature`, unit: "°C", kind: "temp", v: g.temp });
+    out.push({ key: `${g.id}.load`, label: `${shortGpu(g.name, s.cpu.name)} load`, unit: "%", kind: "pct", v: g.load });
   });
   s.fans.forEach((f, i) => out.push({ key: `fan${i}`, label: f.name, unit: "rpm", kind: "rpm", v: f.rpm }));
   out.push({ key: "mem", label: "Memory in use", unit: "%", kind: "pct", v: (100 * s.memory.used) / s.memory.total });

@@ -40,6 +40,9 @@ internal sealed record ProcRow(int Pid, string Name, double Cpu, long Ram, long 
     public string GpuLuid { get; set; } = "";
     public string GpuEngine { get; set; } = "";
     public long Vram { get; set; }
+    /// <summary>Busiest-engine utilisation per adapter LUID, and dedicated memory per adapter LUID.</summary>
+    public Dictionary<string, double> GpuByLuid { get; } = new();
+    public Dictionary<string, long> VramByLuid { get; } = new();
 }
 
 internal sealed class ProcessSampler
@@ -107,7 +110,9 @@ internal sealed class ProcessSampler
         }
         foreach (var ((pid, luid, eng), v) in perProc)
         {
-            if (!rows.TryGetValue(pid, out var row) || v <= row.Gpu) continue;
+            if (!rows.TryGetValue(pid, out var row)) continue;
+            row.GpuByLuid[luid] = Math.Max(row.GpuByLuid.GetValueOrDefault(luid), Math.Min(100, v));
+            if (v <= row.Gpu) continue;
             row.Gpu = Math.Min(100, v);
             row.GpuLuid = luid;
             row.GpuEngine = eng;
@@ -125,7 +130,14 @@ internal sealed class ProcessSampler
                 if (!n.StartsWith("pid_")) continue;
                 var end = n.IndexOf('_', 4);
                 if (end < 0 || !int.TryParse(n.AsSpan(4, end - 4), out var pid)) continue;
-                if (rows.TryGetValue(pid, out var row)) row.Vram += inst.RawValue;
+                if (!rows.TryGetValue(pid, out var row)) continue;
+                row.Vram += inst.RawValue;
+                var li = n.IndexOf("luid_", StringComparison.Ordinal);
+                if (li >= 0 && n.Length >= li + 26)
+                {
+                    var luid = n.Substring(li, 26);
+                    row.VramByLuid[luid] = row.VramByLuid.GetValueOrDefault(luid) + inst.RawValue;
+                }
             }
         }
 

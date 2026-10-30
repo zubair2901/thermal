@@ -15,22 +15,25 @@ export function send(msg: { type: string; [k: string]: unknown }) {
   webview?.postMessage(msg);
 }
 
-export function listen<T>(type: string, cb: (msg: T) => void) {
-  webview?.addEventListener("message", (e) => {
-    const d = e.data as { type?: string };
-    if (d?.type === type) cb(d as T);
-  });
+const listeners = new Map<string, Set<(msg: unknown) => void>>();
+webview?.addEventListener("message", (e) => {
+  const d = e.data as { type?: string };
+  if (d?.type) listeners.get(d.type)?.forEach((cb) => cb(d));
+});
+
+/** Subscribe to a message type from the host. Returns an unsubscribe function. */
+export function listen<T>(type: string, cb: (msg: T) => void): () => void {
+  const set = listeners.get(type) ?? new Set();
+  set.add(cb as (msg: unknown) => void);
+  listeners.set(type, set);
+  return () => set.delete(cb as (msg: unknown) => void);
 }
 
 export function subscribe(cb: Listener): () => void {
   if (webview) {
-    const handler = (e: { data: unknown }) => {
-      const d = e.data as { type?: string; snapshot?: Snapshot };
-      if (d?.type === "snapshot" && d.snapshot) cb(d.snapshot);
-    };
-    webview.addEventListener("message", handler);
+    const off = listen<{ snapshot: Snapshot }>("snapshot", (d) => cb(d.snapshot));
     send({ type: "ready" });
-    return () => {};
+    return off;
   }
   // Running in a plain browser (vite dev): feed synthetic data so the UI can be worked on.
   const id = window.setInterval(() => cb(mock()), 1000);
@@ -85,6 +88,33 @@ function mock(): Snapshot {
       { hw: "AMD Ryzen 7 8845HS", type: "Power", name: "Package", value: 31.4, min: 4, max: 54 },
       { hw: "NVIDIA GeForce RTX 4060 Laptop GPU", type: "Clock", name: "GPU Core", value: 2010, min: 210, max: 2370 },
     ],
-    notes: [],
+    notes: [{ id: "pawnio", text: "CPU die temperature and package power need the PawnIO driver, a small signed driver that sensor tools use to read the processor. Without it the temperature shown is an estimate.", action: "installPawnIO" }],
+    fps: phase % 40 < 25 ? { pid: 4412, name: "cyberpunk2077", fps: wave(4, 88, 40), frameTimeMs: 8.4, low1: 71 } : null,
+    recording: null,
+    power: {
+      onBattery: true,
+      drainW: 24.6,
+      cpuW: 9.8,
+      gpus: [
+        { id: "nv", name: "NVIDIA GeForce RTX 4060 Laptop GPU", kind: "discrete", watts: 6.1, awake: true, wakeApps: ["steamwebhelper", "Discord"], wokenByThermal: false },
+        { id: "amd", name: "AMD Radeon(TM) Graphics", kind: "integrated", watts: 3.2, awake: true, wakeApps: [], wokenByThermal: false },
+      ],
+      restW: 5.5,
+      apps: [
+        { name: "chrome", title: "Google Chrome", share: 0.31, watts: 5.9, cpuW: 4.1, gpuW: 1.8, wh: null },
+        { name: "Code", title: "Visual Studio Code", share: 0.17, watts: 3.2, cpuW: 3.2, gpuW: 0, wh: null },
+        { name: "steamwebhelper", title: "Steam Client WebHelper", share: 0.14, watts: 2.7, cpuW: 0.4, gpuW: 2.3, wh: null },
+        { name: "Discord", title: "Discord", share: 0.09, watts: 1.7, cpuW: 0.6, gpuW: 1.1, wh: null },
+        { name: "MsMpEng", title: "Antimalware Service Executable", share: 0.05, watts: 1.0, cpuW: 1.0, gpuW: 0, wh: null },
+      ],
+      sinceMinutes: 47,
+      sinceWh: 18.4,
+      sinceApps: [
+        { name: "chrome", title: "Google Chrome", share: 0.28, watts: null, cpuW: null, gpuW: null, wh: 5.2 },
+        { name: "Code", title: "Visual Studio Code", share: 0.15, watts: null, cpuW: null, gpuW: null, wh: 2.8 },
+        { name: "steamwebhelper", title: "Steam Client WebHelper", share: 0.12, watts: null, cpuW: null, gpuW: null, wh: 2.2 },
+      ],
+      health: { designWh: 70, fullWh: 65.5, wearPct: 6.4, cycles: 112 },
+    },
   };
 }

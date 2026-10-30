@@ -13,6 +13,8 @@ internal sealed class Collector : IDisposable
     private readonly Computer _computer;
     private readonly HpBios _hp;
     private readonly ProcessSampler _procs = new();
+    private readonly PowerModel _power = new();
+    private readonly Dictionary<string, string> _gpuLuids = new();
     private readonly Dictionary<int, string> _descriptions = new();
     private readonly PerformanceCounter? _cpuPerf;
     private readonly double _baseClock;
@@ -56,7 +58,13 @@ internal sealed class Collector : IDisposable
 
     public Snapshot Collect()
     {
-        var notes = new List<string>();
+        var notes = new List<Note>();
+        if (_reopen)
+        {
+            _reopen = false;
+            _computer.Close();
+            _computer.Open();
+        }
         foreach (var hw in _computer.Hardware)
         {
             if (hw.HardwareType == HardwareType.GpuNvidia && !PollDiscreteGpu) continue;
@@ -70,8 +78,7 @@ internal sealed class Collector : IDisposable
         var cpu = BuildCpu(notes);
         var gpus = BuildGpus();
         var fans = BuildFans();
-        if (!_elevated) notes.Add("Running without administrator rights. Fan speeds, CPU temperature and power need Thermal to run as administrator.");
-        else if (fans.Length == 0) notes.Add("No fan sensors were found on this machine.");
+        if (!_elevated) notes.Add(new Note("admin", "Running without administrator rights. Fan speeds, CPU temperature and power need Thermal to run as administrator."));
 
         var adapterNames = _adapters.ToDictionary(a => a.Luid, a => a.Name);
         var procInfos = procs
@@ -80,15 +87,16 @@ internal sealed class Collector : IDisposable
             .ToArray();
         PruneDescriptions(procs);
 
-        return new Snapshot(
+        var snap = new Snapshot(
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             new MachineInfo(_machineName, _model, _os, Environment.TickCount64 / 1000, _elevated),
             cpu, gpus, fans, BuildMemory(), BuildBattery(), BuildDisks(), BuildNet(), procInfos, BuildSensors(), notes.ToArray());
+        return snap with { Power = _power.Build(snap, procs, _gpuLuids, PollDiscreteGpu) };
     }
 
     // ---------- CPU ----------
 
-    private CpuInfo BuildCpu(List<string> notes)
+    private CpuInfo BuildCpu(List<Note> notes)
     {
         var hw = _computer.Hardware.FirstOrDefault(h => h.HardwareType == HardwareType.Cpu);
         var name = hw?.Name ?? "CPU";
@@ -110,7 +118,7 @@ internal sealed class Collector : IDisposable
             tempSource = "the HP BIOS sensor";
             if (temp == null) { temp = AcpiZone(); tempSource = "the ACPI thermal zone, an approximation"; }
             if (temp == null) tempSource = "unavailable";
-            if (_elevated) notes.Add("CPU die temperature and package power need the PawnIO driver. Install it by running “winget install namazso.PawnIO” in an administrator terminal, then restart Thermal.");
+            if (_elevated && !PawnIoInstalled()) notes.Add(new Note("pawnio", "CPU die temperature and package power need the PawnIO driver, a small signed driver that sensor tools use to read the processor. Without it the temperature shown is an estimate.", "installPawnIO"));
         }
 
         var clocks = sensors.Where(s => s.SensorType == SensorType.Clock && s.Name.StartsWith("Core #") && s.Value > 0)
@@ -126,6 +134,14 @@ internal sealed class Collector : IDisposable
         var power = Live(Val(sensors, SensorType.Power, "Package") ?? Val(sensors, SensorType.Power, "CPU Package"));
         return new CpuInfo(name, Math.Round(total, 1), threads.Select(t => Math.Round(t, 1)).ToArray(), R(temp), tempSource, R(clockAvg), R(clockMax), R(power, 1));
     }
+
+    private static bool PawnIoInstalled() =>
+        File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "drivers", "PawnIO.sys"))
+        || Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\PawnIO") != null;
+
+    /// <summary>Re-open LibreHardwareMonitor so it picks up a driver installed while Thermal was running.</summary>
+    public void Reopen() => _reopen = true;
+    private volatile bool _reopen;
 
     private static double? AcpiZone()
     {
@@ -169,8 +185,10 @@ internal sealed class Collector : IDisposable
             double? fan = polled ? Val(s, SensorType.Fan, "GPU Fan") ?? s.FirstOrDefault(x => x.SensorType == SensorType.Fan)?.Value : null;
             if ((fan == null || fan == 0) && !integrated && hp != null) fan = hp[1];
 
+            var id = $"gpu-{a.VendorId:x4}-{(integrated ? "i" : "d")}";
+            _gpuLuids[id] = a.Luid;
             list.Add(new GpuInfo(
-                $"gpu-{a.VendorId:x4}-{(integrated ? "i" : "d")}",
+                id,
                 a.Name,
                 integrated ? "integrated" : "discrete",
                 R(load, 1),

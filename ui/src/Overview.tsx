@@ -70,7 +70,7 @@ function GpuInstrument({ g, snap, history }: { g: Gpu; snap: Snapshot; history: 
   return (
     <section className={g.active ? "inst" : "inst asleep"} aria-label={g.name}>
       <h2>
-        {shortGpu(g.name)}
+        {shortGpu(g.name, snap.cpu.name)}
         <span className="kind">{g.kind === "discrete" ? "dedicated" : "integrated"}</span>
       </h2>
       <div className="inst-top">
@@ -231,7 +231,7 @@ function Heaviest({ snap, onMore }: { snap: Snapshot; onMore: () => void }) {
               <td className="n" style={{ background: heat(p.cpu / 50, Math.min(0.4, p.cpu / 80)) }}>{num(p.cpu, 1)}%</td>
               <td className="n">{bytes(p.ram)}</td>
               <td className="n" style={{ background: heat(p.gpu / 100, Math.min(0.4, p.gpu / 140)) }}>{p.gpu ? `${num(p.gpu)}%` : "–"}</td>
-              <td className="muted">{p.gpu ? `${shortGpu(p.gpuName)} ${p.gpuEngine}` : ""}</td>
+              <td className="muted">{p.gpu ? `${shortGpu(p.gpuName, snap.cpu.name)} ${p.gpuEngine}` : ""}</td>
             </tr>
           ))}
         </tbody>
@@ -244,6 +244,15 @@ export default function Overview({ snap, history, onOpenProcesses }: Props) {
   const rows = [...history.values()];
   return (
     <div className="overview">
+      {snap.fps && (
+        <p className="game" aria-live="polite">
+          <span className="game-fps">{Math.round(snap.fps.fps)}</span>
+          <span>
+            frames per second in <b>{snap.fps.name}</b>
+            {snap.fps.low1 != null && <>, 1% low {snap.fps.low1}</>}, {snap.fps.frameTimeMs} ms per frame
+          </span>
+        </p>
+      )}
       <div className="band">
         <CpuInstrument snap={snap} history={history} />
         {snap.gpus.map((g) => (
@@ -266,7 +275,7 @@ export default function Overview({ snap, history, onOpenProcesses }: Props) {
               const v = s.values[s.values.length - 1];
               return (
                 <li key={s.key}>
-                  <span>{s.label.replace(/NVIDIA GeForce |AMD |\(TM\)| Laptop GPU/g, "")}</span>
+                  <span>{s.label}</span>
                   <b>{v == null ? "–" : `${Math.round(v).toLocaleString()} ${s.unit}`}</b>
                 </li>
               );
