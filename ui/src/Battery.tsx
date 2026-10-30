@@ -8,7 +8,7 @@ function hm(minutes: number) {
   return h ? `${h} h ${m} min` : `${m} min`;
 }
 
-export default function Battery({ snap, onReadSensors }: { snap: Snapshot; onReadSensors: (v: boolean) => void }) {
+export default function Battery({ snap, reading, onReadSensors }: { snap: Snapshot; reading: boolean; onReadSensors: (v: boolean) => void }) {
   const p = snap.power;
   const bat = snap.battery;
   if (!p) return <p className="empty">Power readings start after the first few seconds.</p>;
@@ -74,7 +74,7 @@ export default function Battery({ snap, onReadSensors }: { snap: Snapshot; onRea
       )}
 
       {dgpu && (
-        <GpuWake gpu={dgpu} igpuName={igpu ? shortGpu(igpu.name, snap.cpu.name) : "integrated GPU"} onBattery={p.onBattery} onReadSensors={onReadSensors} />
+        <GpuWake gpu={dgpu} igpuName={igpu ? shortGpu(igpu.name, snap.cpu.name) : "integrated GPU"} onBattery={p.onBattery} reading={reading} onReadSensors={onReadSensors} />
       )}
 
       <div className="battery-cols">

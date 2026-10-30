@@ -78,11 +78,13 @@ export default function GpuWake({
   gpu,
   igpuName,
   onBattery,
+  reading,
   onReadSensors,
 }: {
   gpu: Gpu;
   igpuName: string;
   onBattery: boolean;
+  reading: boolean;
   onReadSensors: (v: boolean) => void;
 }) {
   const [results, setResults] = useState<Record<string, Result>>({});
@@ -140,6 +142,19 @@ export default function GpuWake({
         {gpu.wakeApps.map((a) => (
           <WakeRow key={a.name} app={a} igpuName={igpuName} result={results[a.name]} />
         ))}
+        {reading && onBattery && (
+          <li className="wake">
+            <div className="wake-name">
+              Thermal
+              <p className="wake-status">Reading {name}'s temperature and clocks also keeps it awake. Per-app GPU use still works without it.</p>
+            </div>
+            <div className="wake-actions">
+              <button className="primary" onClick={() => onReadSensors(false)}>
+                Stop reading its sensors
+              </button>
+            </div>
+          </li>
+        )}
       </ul>
       <p className="muted">
         Games and 3D apps run slower on the {igpuName}. To undo a change, set the app back to High performance in{" "}

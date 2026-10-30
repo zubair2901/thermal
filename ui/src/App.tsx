@@ -166,7 +166,7 @@ export default function App() {
 
             {view === "overview" && <Overview snap={snap} history={history} onOpenProcesses={() => setView("processes")} />}
             {view === "processes" && <Processes snap={snap} />}
-            {view === "battery" && <Battery snap={snap} onReadSensors={(v) => updateSettings({ pollDgpu: v })} />}
+            {view === "battery" && <Battery snap={snap} reading={host?.settings.pollDgpu ?? false} onReadSensors={(v) => updateSettings({ pollDgpu: v })} />}
             {view === "sensors" && <Sensors snap={snap} />}
             {view === "sessions" && host && <Sessions snap={snap} host={host} />}
             {view === "settings" && host && <SettingsView host={host} update={updateSettings} />}
