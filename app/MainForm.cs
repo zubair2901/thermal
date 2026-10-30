@@ -77,6 +77,8 @@ internal sealed class MainForm : Form
         DwmSetWindowAttribute(Handle, 20 /* DWMWA_USE_IMMERSIVE_DARK_MODE */, ref dark, sizeof(int));
         var caption = 0x00261B16; // COLORREF (BGR) of --ink-0
         DwmSetWindowAttribute(Handle, 35 /* DWMWA_CAPTION_COLOR */, ref caption, sizeof(int));
+        // Be told when the display turns off or on (lid, Modern Standby), to pause hardware polling meanwhile.
+        RegisterPowerSettingNotification(Handle, ref _consoleDisplayState, 0 /* DEVICE_NOTIFY_WINDOW_HANDLE */);
         _ = InitAsync();
     }
 
@@ -114,6 +116,7 @@ internal sealed class MainForm : Form
 
     private void Tick()
     {
+        if (_screenOff || DateTime.UtcNow < _resumeAt) return;
         if (_collector == null || Interlocked.Exchange(ref _busy, 1) == 1) return;
         try
         {
@@ -318,7 +321,48 @@ internal sealed class MainForm : Form
             _settings.OverlayEnabled = !_settings.OverlayEnabled;
             ApplySettings();
         }
+        else if (m.Msg == 0x0218 /* WM_POWERBROADCAST */)
+        {
+            var ev = m.WParam.ToInt32();
+            if (ev == 0x8013 /* PBT_POWERSETTINGCHANGE: console display state */)
+            {
+                // POWERBROADCAST_SETTING: Guid (16 bytes), DataLength (4), Data: 0 off, 1 on, 2 dimmed.
+                var state = Marshal.ReadInt32(m.LParam, 20);
+                if (state == 0) ScreenOff();
+                else if (state == 1) ScreenOn();
+            }
+            else if (ev == 0x0004 /* PBT_APMSUSPEND */) ScreenOff();
+            else if (ev == 0x0012 /* PBT_APMRESUMEAUTOMATIC */) ScreenOn();
+        }
         base.WndProc(ref m);
+    }
+
+    // ---------- Screen off / standby ----------
+
+    private volatile bool _screenOff;
+    private DateTime _resumeAt = DateTime.MinValue;
+    private static Guid _consoleDisplayState = new("6FE69556-704A-47A0-8F24-C28D936FDA47");
+
+    /// <summary>Stop reading hardware while the screen is off (lid closed, Modern Standby) and let go of every driver.</summary>
+    private void ScreenOff()
+    {
+        if (_screenOff) return;
+        _screenOff = true;
+        Task.Run(() =>
+        {
+            // Let a reading in progress finish before disconnecting.
+            for (var i = 0; i < 60 && Volatile.Read(ref _busy) == 1; i++) Thread.Sleep(50);
+            try { _collector?.Suspend(); Trace("screen off: paused, sensor drivers released"); } catch (Exception ex) { Log(ex); }
+        });
+    }
+
+    /// <summary>Give the display and graphics drivers a few seconds to finish waking before polling again.</summary>
+    private void ScreenOn()
+    {
+        if (!_screenOff) return;
+        _resumeAt = DateTime.UtcNow.AddSeconds(5);
+        _screenOff = false;
+        Trace("screen on: resuming in 5 s");
     }
 
     // ---------- Window lifecycle ----------
@@ -415,6 +459,7 @@ internal sealed class MainForm : Form
     [DllImport("dwmapi.dll")] private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
     [DllImport("user32.dll")] private static extern bool RegisterHotKey(IntPtr hwnd, int id, uint mods, uint vk);
     [DllImport("user32.dll")] private static extern bool UnregisterHotKey(IntPtr hwnd, int id);
+    [DllImport("user32.dll")] private static extern IntPtr RegisterPowerSettingNotification(IntPtr recipient, ref Guid setting, int flags);
 }
 
 /// <summary>"Start with Windows" for an app that needs elevation: a logon task with highest privileges (the Run key can't elevate).</summary>

@@ -121,7 +121,41 @@ internal sealed class Collector : IDisposable
         }
     }
 
+    private readonly object _sync = new();
+    private bool _suspended;
+
+    /// <summary>
+    /// Fully disconnect from every sensor driver (CPU, GPUs, SMBus, storage). Called when the screen turns off, so
+    /// nothing holds hardware open through Modern Standby or competes with the graphics drivers while the display wakes.
+    /// The next <see cref="Collect"/> reconnects.
+    /// </summary>
+    public void Suspend()
+    {
+        lock (_sync)
+        {
+            if (_suspended) return;
+            _computer.Close();
+            _suspended = true;
+        }
+    }
+
     public Snapshot Collect()
+    {
+        lock (_sync)
+        {
+            if (_suspended)
+            {
+                // Reconnect without the dedicated GPU; it gets reconnected only if an app is using it.
+                _gpuOpen = false;
+                _dgpuUsedSince = _dgpuIdleSince = null;
+                _computer = OpenComputer(false);
+                _suspended = false;
+            }
+            return CollectCore();
+        }
+    }
+
+    private Snapshot CollectCore()
     {
         var notes = new List<Note>();
         var procs = _procs.Sample();

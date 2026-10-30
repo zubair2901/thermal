@@ -144,8 +144,17 @@ internal abstract class LayeredWindow : Form
         }
     }
 
-    public void KeepOnTop() =>
+    /// <summary>
+    /// Re-apply "always on top" only if something removed it. Windows keeps a topmost window above normal ones, and
+    /// reshuffling the z-order every second can get in the way of other apps coming to the front (e.g. from a notification).
+    /// </summary>
+    public void KeepOnTop()
+    {
+        if ((GetWindowLong(Handle, -20 /* GWL_EXSTYLE */) & 0x8 /* WS_EX_TOPMOST */) != 0) return;
         SetWindowPos(Handle, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 /* NOSIZE|NOMOVE|NOACTIVATE */);
+    }
+
+    [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hwnd, int index);
 
     [StructLayout(LayoutKind.Sequential)] private struct POINT { public int X, Y; }
     [StructLayout(LayoutKind.Sequential)] private struct SIZE { public int cx, cy; }
