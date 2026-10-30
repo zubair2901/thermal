@@ -2,7 +2,7 @@
 
 A hardware monitor for Windows laptops. It shows temperatures, fan speeds, both GPUs side by side, which app is using which GPU, where your battery is going, and a frame-rate overlay for games.
 
-It was built on an HP Victus 15 (Ryzen 7 8845HS, RTX 4060 Laptop, Radeon 780M) and works on any Windows 10 or 11 PC. HP laptops get fan speeds through the HP BIOS; other machines get whatever fan sensors LibreHardwareMonitor can see.
+It was built and tested on an HP Victus 15 (Ryzen 7 8845HS, RTX 4060 Laptop, Radeon 780M). It runs on any 64-bit Windows 10 or 11 PC; how many sensors it can read depends on the hardware, see [Will it work on my PC?](#will-it-work-on-my-pc)
 
 ![Thermal overview](docs/overview.jpg)
 
@@ -12,14 +12,50 @@ It was built on an HP Victus 15 (Ryzen 7 8845HS, RTX 4060 Laptop, Radeon 780M) a
 
 ## Install
 
-Download from [Releases](../../releases):
+You need Windows 10 or 11 on a 64-bit Intel or AMD processor. Nothing else: the .NET runtime is built in, and WebView2 comes with Windows 11 and up-to-date Windows 10.
 
-- **Thermal-Setup-x.y.z.exe** installs Thermal with a Start menu shortcut and an uninstaller.
-- **Thermal.exe** is the same app as a single portable file.
+1. Download **[Thermal-Setup.exe](../../releases/latest/download/Thermal-Setup.exe)** from the latest release.
+2. Run it. Windows SmartScreen may say "Windows protected your PC", because the app isn't code-signed yet: choose **More info**, then **Run anyway**.
+3. Approve the administrator prompt, finish the installer, and Thermal opens. It's in the Start menu from then on.
+4. If Thermal shows a note about PawnIO, click **Install PawnIO**. That small signed driver lets it read the CPU's exact temperature and power on AMD and Intel processors. Until it's installed, the CPU temperature is an estimate.
 
-Thermal asks for administrator rights when it starts. Fan speeds, CPU temperature and the frame-rate counter all need them.
+Thermal asks for administrator rights each time it starts, because fan speeds, CPU sensors and the frame-rate counter need them. To start it with Windows without that prompt, turn on **Start with Windows** in Settings.
 
-Windows SmartScreen may say "Windows protected your PC" the first time, because the app isn't code-signed yet. Choose **More info**, then **Run anyway**.
+Prefer not to install anything? **[Thermal.exe](../../releases/latest/download/Thermal.exe)** is the same app as one portable file. Run it from any folder.
+
+**Uninstall** from Settings > Apps > Installed apps > Thermal. That also removes the Start with Windows task. Your settings stay in `%APPDATA%Thermal` and recorded sessions in `DocumentsThermal sessions`; delete them by hand if you want them gone.
+
+### Installing from a terminal, or with an AI assistant
+
+These commands work in PowerShell. An assistant such as Claude Code can run them too, but a person still has to approve the administrator prompt.
+
+```powershell
+$setup = "$env:TEMPThermal-Setup.exe"
+Invoke-WebRequest https://github.com/zubair2901/thermal/releases/latest/download/Thermal-Setup.exe -OutFile $setup
+Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Verb RunAs -Wait
+```
+
+Optional, for exact CPU temperature and power:
+
+```powershell
+winget install --id namazso.PawnIO -e
+```
+
+Then open **Thermal** from the Start menu.
+
+## Will it work on my PC?
+
+| Part | What to expect |
+| --- | --- |
+| Windows version | Windows 10 or 11, 64-bit (x64). Not Windows on ARM (Snapdragon laptops), macOS or Linux. |
+| CPU | Intel and AMD: load per thread, clock. Temperature and package power need PawnIO (see Install). |
+| Graphics | NVIDIA, AMD and Intel, dedicated or integrated. Per-app GPU use comes from Windows itself, so it works with any brand. |
+| Hybrid-graphics laptops | Thermal only reads the dedicated GPU's sensors while an app is using it, so the GPU can still sleep on battery. |
+| Fan speeds | HP Omen and Victus laptops: CPU and GPU fan RPM through the HP BIOS. Desktops: whatever the motherboard's sensor chip reports. Many Dell, Lenovo, ASUS and Acer laptops hide their fans from Windows, and Thermal shows "No fan sensors" there. |
+| Battery view | Laptops only. Desktops hide it. |
+| Frame rate | DirectX 9 to 12 games, and Vulkan or OpenGL games that present through DXGI. Exclusive-fullscreen games hide every overlay. |
+
+So far Thermal has only been tested on the HP Victus above. If something is missing or wrong on your machine, open an issue and attach the output of `Thermal.exe --dump sensors.json` (run as administrator).
 
 ### CPU temperature and power on AMD and Intel
 

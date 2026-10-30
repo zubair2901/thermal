@@ -45,6 +45,8 @@ jobs:
         run: |
           choco install innosetup --no-progress -y
           & "${env:ProgramFiles(x86)}\Inno Setup 6\iscc.exe" /DAppVersion=${{ steps.version.outputs.value }} installer\thermal.iss
+          # A fixed name too, so releases/latest/download/Thermal-Setup.exe always points at the newest installer.
+          Copy-Item dist\Thermal-Setup-${{ steps.version.outputs.value }}.exe dist\Thermal-Setup.exe
 
       - uses: actions/upload-artifact@v4
         with:
@@ -59,4 +61,5 @@ jobs:
         with:
           files: |
             dist/Thermal.exe
+            dist/Thermal-Setup.exe
             dist/Thermal-Setup-*.exe
