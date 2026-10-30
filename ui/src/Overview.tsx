@@ -18,13 +18,15 @@ function Temp({ c }: { c: number | null }) {
   );
 }
 
+const rpm = (r: number | null | undefined) => (r === 0 ? "Stopped" : num(r));
+
 function Stat({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
     <div className="stat">
       <dt>{label}</dt>
       <dd>
         {value}
-        {unit && value !== "–" && <small> {unit}</small>}
+        {unit && /\d/.test(value) && <small> {unit}</small>}
       </dd>
     </div>
   );
@@ -55,7 +57,7 @@ function CpuInstrument({ snap, history }: { snap: Snapshot; history: Map<string,
       <dl className="stats">
         <Stat label="Clock" value={c.clockAvg == null ? "–" : (c.clockAvg / 1000).toFixed(2)} unit="GHz" />
         <Stat label="Power" value={num(c.power, 1)} unit="W" />
-        <Stat label="Fan" value={num(cpuFan?.rpm)} unit="rpm" />
+        <Stat label="Fan" value={rpm(cpuFan?.rpm)} unit="rpm" />
         <Stat label="Threads" value={String(c.cores.length)} />
       </dl>
     </section>
@@ -100,7 +102,7 @@ function GpuInstrument({ g, snap, history }: { g: Gpu; snap: Snapshot; history: 
       <dl className="stats">
         <Stat label="Core clock" value={num(g.clockCore)} unit="MHz" />
         <Stat label="Power" value={num(g.power, 1)} unit="W" />
-        <Stat label={g.kind === "discrete" ? "Fan" : "Shared memory"} value={g.kind === "discrete" ? num(fan) : bytes(g.memShared)} unit={g.kind === "discrete" ? "rpm" : undefined} />
+        <Stat label={g.kind === "discrete" ? "Fan" : "Shared memory"} value={g.kind === "discrete" ? rpm(fan) : bytes(g.memShared)} unit={g.kind === "discrete" ? "rpm" : undefined} />
         <Stat label={g.kind === "discrete" ? "VRAM" : "Reserved memory"} value={`${bytes(g.memUsed)} of ${bytes(g.memTotal, 0)}`} />
       </dl>
       {memPct != null && <meter className="vram" min={0} max={100} value={memPct} style={{ ["--c" as string]: heat(memPct / 100) }} />}
