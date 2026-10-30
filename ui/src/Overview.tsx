@@ -9,10 +9,11 @@ interface Props {
   onOpenProcesses: () => void;
 }
 
-function Temp({ c }: { c: number | null }) {
+function Temp({ c, missing = "No reading" }: { c: number | null; missing?: string }) {
+  if (c == null) return <div className="temp temp-missing">{missing}</div>;
   return (
-    <div className="temp" style={{ color: c == null ? undefined : heat(scale.temp(c)) }}>
-      {c == null ? "–" : Math.round(c)}
+    <div className="temp" style={{ color: heat(scale.temp(c)) }}>
+      {Math.round(c)}
       <span className="deg">°C</span>
     </div>
   );
@@ -74,7 +75,7 @@ function GpuInstrument({ g, snap, history }: { g: Gpu; snap: Snapshot; history: 
         <span className="kind">{g.kind === "discrete" ? "dedicated" : "integrated"}</span>
       </h2>
       <div className="inst-top">
-        <Temp c={g.temp} />
+        <Temp c={g.temp} missing={g.kind === "discrete" && !g.active ? "Asleep" : "No reading"} />
         <div className="load">
           <span className="load-n" style={{ color: heat(scale.pct(g.load)) }}>{num(g.load)}%</span>
           <span className="load-l">load</span>
@@ -104,7 +105,11 @@ function GpuInstrument({ g, snap, history }: { g: Gpu; snap: Snapshot; history: 
       <dl className="stats">
         <Stat label="Core clock" value={num(g.clockCore)} unit="MHz" />
         <Stat label="Power" value={num(g.power, 1)} unit="W" />
-        <Stat label={g.kind === "discrete" ? "Fan" : "Shared memory"} value={g.kind === "discrete" ? rpm(fan) : bytes(g.memShared)} unit={g.kind === "discrete" ? "rpm" : undefined} />
+        <Stat
+          label={g.kind === "discrete" ? (g.active ? "Fan" : "Fan, cooling the CPU") : "Shared memory"}
+          value={g.kind === "discrete" ? rpm(fan) : bytes(g.memShared)}
+          unit={g.kind === "discrete" ? "rpm" : undefined}
+        />
         <Stat label={g.kind === "discrete" ? "VRAM" : "Reserved memory"} value={`${bytes(g.memUsed)} of ${bytes(g.memTotal, 0)}`} />
       </dl>
       {memPct != null && <meter className="vram" min={0} max={100} value={memPct} style={{ ["--c" as string]: heat(memPct / 100) }} />}
@@ -117,6 +122,9 @@ function Fans({ snap }: { snap: Snapshot }) {
   return (
     <section className="panel" aria-label="Fans">
       <h3>Fans</h3>
+      {snap.fans.some((f) => f.source === "HP BIOS") && (
+        <p className="muted fan-note">Both fans cool one shared heatsink, so the GPU fan also spins for the CPU, even while the GPU sleeps.</p>
+      )}
       {snap.fans.length === 0 ? (
         <p className="empty">No fan readings. Run Thermal as administrator so it can query the HP BIOS.</p>
       ) : (

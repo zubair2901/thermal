@@ -9,7 +9,8 @@ namespace Thermal;
 /// <summary>Colours and type shared by the overlay, the widget and the tray icon. Mirrors ui/src/format.ts.</summary>
 internal static class Look
 {
-    public static readonly Color Panel = Color.FromArgb(206, 22, 27, 38);
+    // Opaque: any text behind a see-through panel bleeds into the readings.
+    public static readonly Color Panel = Color.FromArgb(255, 22, 27, 38);
     public static readonly Color Text = Color.FromArgb(228, 232, 240);
     public static readonly Color Muted = Color.FromArgb(141, 151, 171);
     public static readonly Color Faint = Color.FromArgb(95, 106, 128);
@@ -249,7 +250,7 @@ internal sealed class OverlayWindow : LayeredWindow
                 case "igpu" when igpu != null && dgpu != null:
                     rows.Add((dgpu == null ? "GPU" : "iGPU", GpuSegs(igpu)));
                     break;
-                case "vram" when (dgpu ?? igpu) is { MemUsed: not null, MemTotal: > 0 } vg:
+                case "vram" when (dgpu is { Active: true } ? dgpu : dgpu == null ? igpu : null) is { MemUsed: not null, MemTotal: > 0 } vg:
                     rows.Add(("VRAM", new List<Seg> { new($"{vg.MemUsed / 1073741824.0:0.0}", Look.Pct(100 * vg.MemUsed / vg.MemTotal), $"/ {vg.MemTotal / 1073741824.0:0} GB") }));
                     break;
                 case "fans" when s.Fans.Length > 0:
@@ -271,7 +272,10 @@ internal sealed class OverlayWindow : LayeredWindow
 
     private static List<Seg> GpuSegs(GpuInfo g)
     {
-        var segs = new List<Seg> { new(Deg(g.Temp), Look.Temp(g.Temp), "°C"), new($"{g.Load:0}", Look.Pct(g.Load), "%") };
+        if (g.Kind == "discrete" && !g.Active) return new List<Seg> { new("asleep", Look.Muted) };
+        var segs = new List<Seg>();
+        if (g.Temp != null) segs.Add(new(Deg(g.Temp), Look.Temp(g.Temp), "°C"));
+        segs.Add(new($"{g.Load:0}", Look.Pct(g.Load), "%"));
         if (g.ClockCore != null) segs.Add(new($"{g.ClockCore / 1000:0.00}", Look.Text, "GHz"));
         if (g.Power != null) segs.Add(new($"{g.Power:0}", Look.Text, "W"));
         return segs;
@@ -346,7 +350,7 @@ internal sealed class WidgetWindow : LayeredWindow
         Present(size, g =>
         {
             using (var path = Look.Rounded(new RectangleF(0, 0, size.Width - 1, size.Height - 1), 12 * k))
-            using (var bg = new SolidBrush(Color.FromArgb(235, 29, 36, 51)))
+            using (var bg = new SolidBrush(Color.FromArgb(255, 29, 36, 51)))
                 g.FillPath(bg, path);
 
             using var small = Look.Font(11 * k);
@@ -358,19 +362,22 @@ internal sealed class WidgetWindow : LayeredWindow
             float pad = 14 * k;
 
             // Three temperature columns: CPU and each GPU.
-            var cols = new List<(string name, double? temp, double? load)> { ("CPU", s.Cpu.Temp, s.Cpu.Load) };
-            cols.AddRange(s.Gpus.Select(gp => (Look.ShortGpu(gp.Name, s.Cpu.Name), gp.Temp, gp.Load)));
+            var cols = new List<(string name, double? temp, double? load, bool asleep)> { ("CPU", s.Cpu.Temp, s.Cpu.Load, false) };
+            cols.AddRange(s.Gpus.Select(gp => (Look.ShortGpu(gp.Name, s.Cpu.Name), gp.Temp, gp.Load, gp.Kind == "discrete" && !gp.Active)));
             var colW = (size.Width - pad * 2) / cols.Count;
             for (var i = 0; i < cols.Count; i++)
             {
-                var (name, temp, load) = cols[i];
+                var (name, temp, load, asleep) = cols[i];
                 var x = pad + i * colW;
                 g.DrawString(name, small, muted, x, pad, fmt);
-                using var tb = new SolidBrush(Look.Temp(temp));
-                var t = temp == null ? "–" : $"{temp:0}°";
-                g.DrawString(t, big, tb, x - 1 * k, pad + 14 * k, fmt);
-                using var lb = new SolidBrush(Look.Pct(load));
-                g.DrawString($"{load:0}% load", small, lb, x, pad + 50 * k, fmt);
+                // A sleeping dedicated GPU says so; a GPU without a temperature reading shows its load as the big number.
+                var (big1, color, sub) = asleep ? ("off", Look.Faint, "asleep")
+                    : temp != null ? ($"{temp:0}°", Look.Temp(temp), $"{load:0}% load")
+                    : ($"{load:0}%", Look.Pct(load), "load");
+                using var tb = new SolidBrush(color);
+                g.DrawString(big1, big, tb, x - 1 * k, pad + 14 * k, fmt);
+                using var lb = new SolidBrush(asleep ? Look.Faint : Look.Pct(load));
+                g.DrawString(sub, small, lb, x, pad + 50 * k, fmt);
             }
 
             // Two-minute traces: CPU solid, GPU dimmer.

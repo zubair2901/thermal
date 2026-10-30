@@ -4,11 +4,13 @@ A hardware monitor for Windows laptops. It shows temperatures, fan speeds, both 
 
 It was built and tested on an HP Victus 15 (Ryzen 7 8845HS, RTX 4060 Laptop, Radeon 780M). It runs on any 64-bit Windows 10 or 11 PC; how many sensors it can read depends on the hardware, see [Will it work on my PC?](#will-it-work-on-my-pc)
 
-![Thermal overview](docs/overview.jpg)
+![Thermal overview](docs/overview.png)
 
 | Desktop widget | Game overlay |
 | --- | --- |
-| ![Widget](docs/widget.jpg) | ![Overlay](docs/overlay.jpg) |
+| ![Widget](docs/widget.png) | ![Overlay](docs/overlay.png) |
+
+![Battery view: power split, per-app estimates and battery health](docs/battery.png)
 
 ## Install
 
