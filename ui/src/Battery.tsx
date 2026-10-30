@@ -17,8 +17,9 @@ export default function Battery({ snap, reading, onReadSensors }: { snap: Snapsh
   const igpu = p.gpus.find((g) => g.kind === "integrated");
   const u = p.unplugged;
   const parts = [
-    { label: "Processor", w: p.cpuW, cls: "cpu" },
-    ...p.gpus.map((g) => ({ label: shortGpu(g.name, snap.cpu.name), w: g.watts, cls: g.kind === "discrete" ? "dgpu" : "igpu" })),
+    // The integrated GPU is on the CPU die, so the processor's package power already includes it.
+    { label: igpu ? `Processor and ${shortGpu(igpu.name, snap.cpu.name)}` : "Processor", w: p.cpuW, cls: "cpu" },
+    ...p.gpus.filter((g) => g.kind === "discrete").map((g) => ({ label: shortGpu(g.name, snap.cpu.name), w: g.watts, cls: "dgpu" })),
     { label: "Screen, Wi-Fi, storage and the rest", w: p.restW, cls: "rest" },
   ].filter((x) => x.w != null && x.w > 0.05) as { label: string; w: number; cls: string }[];
   const total = p.drainW ?? parts.reduce((a, x) => a + x.w, 0);

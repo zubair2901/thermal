@@ -71,6 +71,7 @@ function GpuInstrument({ g, snap, history }: { g: Gpu; snap: Snapshot; history: 
   // Thermal reads all GPU temperatures over one connection, which it keeps closed while no app uses the dedicated GPU.
   const dgpu = snap.gpus.find((x) => x.kind === "discrete");
   const paused = g.kind === "integrated" && g.temp == null && !snap.gpuSensorsConnected && !!dgpu;
+  const asleep = g.kind === "discrete" && !g.active;
   return (
     <section className={g.active ? "inst" : "inst asleep"} aria-label={g.name}>
       <h2>
@@ -121,13 +122,24 @@ function GpuInstrument({ g, snap, history }: { g: Gpu; snap: Snapshot; history: 
       </div>
       <Trace series={history.get(`${g.id}.load`)} />
       <dl className="stats">
-        <Stat label="Core clock" value={num(g.clockCore)} unit="MHz" />
-        <Stat label="Power" value={num(g.power, 1)} unit="W" />
-        <Stat
-          label={g.kind === "discrete" ? (g.active ? "Fan" : "Fan, cooling the CPU") : "Shared memory"}
-          value={g.kind === "discrete" ? rpm(fan) : bytes(g.memShared)}
-          unit={g.kind === "discrete" ? "rpm" : undefined}
-        />
+        {asleep ? (
+          <>
+            {/* Powered off: no clock, no power. The laptop's fans keep running for the CPU and are shown under Fans. */}
+            <Stat label="Core clock" value="Off" />
+            <Stat label="Power" value="0" unit="W" />
+            <Stat label="State" value="Powered off" />
+          </>
+        ) : (
+          <>
+            <Stat label="Core clock" value={num(g.clockCore)} unit="MHz" />
+            <Stat label="Power" value={g.kind === "integrated" && g.power == null ? "Included in CPU" : num(g.power, 1)} unit="W" />
+            <Stat
+              label={g.kind === "discrete" ? "Fan" : "Shared memory"}
+              value={g.kind === "discrete" ? rpm(fan) : bytes(g.memShared)}
+              unit={g.kind === "discrete" ? "rpm" : undefined}
+            />
+          </>
+        )}
         <Stat label={g.kind === "discrete" ? "VRAM" : "Reserved memory"} value={`${bytes(g.memUsed)} of ${bytes(g.memTotal, 0)}`} />
       </dl>
       {memPct != null && <meter className="vram" min={0} max={100} value={memPct} style={{ ["--c" as string]: heat(memPct / 100) }} />}

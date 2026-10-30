@@ -12,6 +12,8 @@ internal sealed class Collector : IDisposable
 {
     private Computer _computer;
     private bool _gpuOpen;
+    private uint _igpuVendor; // set when the integrated GPU can be read separately from the dedicated one
+    private bool _igpuOnly;   // integrated GPU sensors connected while the dedicated GPU's are not
     private readonly DevicePower? _dgpuPower;
     private string _dgpuLuid = "";
     private DateTime? _dgpuUsedSince, _dgpuIdleSince;
@@ -46,6 +48,10 @@ internal sealed class Collector : IDisposable
             _dgpuLuid = discrete.Luid;
             var power = new DevicePower((ushort)discrete.VendorId);
             _dgpuPower = power.Found ? power : null;
+            // The integrated GPU can be read on its own only when it comes from a different vendor than the dedicated
+            // one; otherwise the vendor's driver would enumerate (and wake) the dedicated GPU too.
+            var integrated = _adapters.FirstOrDefault(a => a.DedicatedVideo < 1UL << 30);
+            if (integrated != null && integrated.VendorId != discrete.VendorId) _igpuVendor = integrated.VendorId;
         }
         // Start disconnected from the GPUs if the dedicated one is asleep, so opening Thermal doesn't wake it.
         _gpuOpen = _dgpuPower?.IsOn() != false;
@@ -64,7 +70,7 @@ internal sealed class Collector : IDisposable
         _os = $"{product} {key?.GetValue("DisplayVersion")} ({build})";
     }
 
-    private static Computer OpenComputer(bool gpus)
+    private Computer OpenComputer(bool gpus)
     {
         var c = new Computer
         {
@@ -77,7 +83,42 @@ internal sealed class Collector : IDisposable
             IsBatteryEnabled = true,
         };
         c.Open();
+        _igpuOnly = !gpus && AddIntegratedGpuGroup(c);
         return c;
+    }
+
+    /// <summary>
+    /// LibreHardwareMonitor only switches all GPU vendors on or off together. While the dedicated GPU sleeps, add just
+    /// the integrated GPU's vendor group (AMD ADL or Intel) so its temperature, clock and power keep updating without
+    /// touching the dedicated GPU's driver. These are internal types, so if a library update renames them this
+    /// quietly returns false and the integrated GPU falls back to load and memory from Windows' counters.
+    /// </summary>
+    private bool AddIntegratedGpuGroup(Computer c)
+    {
+        if (_igpuVendor is not (0x1002 or 0x8086)) return false;
+        try
+        {
+            const System.Reflection.BindingFlags Any = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic;
+            var asm = typeof(Computer).Assembly;
+            var settings = typeof(Computer).GetField("_settings", Any)!.GetValue(c);
+            object group;
+            if (_igpuVendor == 0x1002)
+            {
+                group = Activator.CreateInstance(asm.GetType("LibreHardwareMonitor.Hardware.Gpu.AmdGpuGroup", true)!, Any, null, new[] { settings }, null)!;
+            }
+            else
+            {
+                var cpus = typeof(Computer).GetMethod("GetIntelCpus", Any)!.Invoke(c, null);
+                group = Activator.CreateInstance(asm.GetType("LibreHardwareMonitor.Hardware.Gpu.IntelGpuGroup", true)!, Any, null, new[] { cpus, settings }, null)!;
+            }
+            typeof(Computer).GetMethod("Add", Any)!.Invoke(c, new[] { group });
+            return true;
+        }
+        catch (Exception e)
+        {
+            MainForm.Log(e);
+            return false;
+        }
     }
 
     public Snapshot Collect()
@@ -220,7 +261,8 @@ internal sealed class Collector : IDisposable
                 h.HardwareType is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel && Similar(h.Name, a.Name));
             var s = hw?.Sensors ?? Array.Empty<ISensor>();
             var isNvidia = a.VendorId == 0x10DE;
-            var polled = _gpuOpen && !(isNvidia && !PollDiscreteGpu);
+            var polled = integrated ? _gpuOpen || _igpuOnly : _gpuOpen && !(isNvidia && !PollDiscreteGpu);
+            var asleep = !integrated && _dgpuOn == false;
 
             var engines = _procs.AdapterEngines.GetValueOrDefault(a.Luid) ?? new Dictionary<string, double>();
             var engineArr = engines.OrderByDescending(e => e.Value).Select(e => new EngineLoad(e.Key, Math.Round(e.Value, 1))).ToArray();
@@ -249,7 +291,10 @@ internal sealed class Collector : IDisposable
                 polled ? R(Live(Val(s, SensorType.Temperature, "GPU Hot Spot"))) : null,
                 polled ? R(Val(s, SensorType.Clock, "GPU Core")) : null,
                 polled ? R(Val(s, SensorType.Clock, "GPU Memory")) : null,
-                polled ? R(Val(s, SensorType.Power, "GPU Package") ?? Val(s, SensorType.Power, "GPU Core") ?? Val(s, SensorType.Power, "GPU SoC"), 1) : null,
+                // A powered-off GPU draws nothing; say so rather than leaving the reading blank. An integrated GPU sits on
+                // the CPU die: the CPU package power already includes it, and the driver's own "GPU Core" figure for
+                // APUs swings with CPU load, so it gets no separate reading.
+                asleep ? 0 : integrated ? null : polled ? R(Val(s, SensorType.Power, "GPU Package") ?? Val(s, SensorType.Power, "GPU Core") ?? Val(s, SensorType.Power, "GPU SoC"), 1) : null,
                 memUsed, memTotal, mem.shared,
                 fan, polled ? R(Val(s, SensorType.Control, "GPU Fan")) : null,
                 engineArr,
