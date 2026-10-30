@@ -10,7 +10,13 @@ namespace Thermal.Telemetry;
 /// <summary>Builds one <see cref="Snapshot"/> per tick from LibreHardwareMonitor, the HP BIOS, perf counters and DXGI.</summary>
 internal sealed class Collector : IDisposable
 {
-    private readonly Computer _computer;
+    private Computer _computer;
+    private bool _gpuOpen;
+    private readonly DevicePower? _dgpuPower;
+    private string _dgpuLuid = "";
+    private DateTime? _dgpuUsedSince, _dgpuIdleSince;
+    private bool? _dgpuOn;
+    private readonly int _self = Environment.ProcessId;
     private readonly HpBios _hp;
     private readonly ProcessSampler _procs = new();
     private readonly PowerModel _power = new();
@@ -23,25 +29,27 @@ internal sealed class Collector : IDisposable
     private List<Dxgi.Adapter> _adapters;
     private DateTime _adaptersRefreshed = DateTime.UtcNow;
 
-    /// <summary>Polling the RTX through NVAPI wakes it from its low-power state; users on battery can turn this off.</summary>
+    /// <summary>
+    /// Whether to read the dedicated GPU's sensors while an app is using it. LibreHardwareMonitor's connection to the
+    /// NVIDIA driver keeps a hybrid-graphics GPU powered, so Thermal only connects while something else already woke it.
+    /// </summary>
     public bool PollDiscreteGpu { get; set; } = true;
 
     public Collector()
     {
         _elevated = new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator);
-        _computer = new Computer
-        {
-            IsCpuEnabled = true,
-            IsGpuEnabled = true,
-            IsMemoryEnabled = true,
-            IsMotherboardEnabled = true,
-            IsStorageEnabled = true,
-            IsNetworkEnabled = true,
-            IsBatteryEnabled = true,
-        };
-        _computer.Open();
         _hp = new HpBios();
         _adapters = Dxgi.Enumerate();
+        var discrete = _adapters.FirstOrDefault(a => a.DedicatedVideo >= 1UL << 30);
+        if (discrete != null && _adapters.Count > 1)
+        {
+            _dgpuLuid = discrete.Luid;
+            var power = new DevicePower((ushort)discrete.VendorId);
+            _dgpuPower = power.Found ? power : null;
+        }
+        // Start disconnected from the GPUs if the dedicated one is asleep, so opening Thermal doesn't wake it.
+        _gpuOpen = _dgpuPower?.IsOn() != false;
+        _computer = OpenComputer(_gpuOpen);
 
         try { _cpuPerf = new PerformanceCounter("Processor Information", "% Processor Performance", "_Total"); _cpuPerf.NextValue(); }
         catch { _cpuPerf = null; }
@@ -56,14 +64,35 @@ internal sealed class Collector : IDisposable
         _os = $"{product} {key?.GetValue("DisplayVersion")} ({build})";
     }
 
+    private static Computer OpenComputer(bool gpus)
+    {
+        var c = new Computer
+        {
+            IsCpuEnabled = true,
+            IsGpuEnabled = gpus,
+            IsMemoryEnabled = true,
+            IsMotherboardEnabled = true,
+            IsStorageEnabled = true,
+            IsNetworkEnabled = true,
+            IsBatteryEnabled = true,
+        };
+        c.Open();
+        return c;
+    }
+
     public Snapshot Collect()
     {
         var notes = new List<Note>();
-        if (_reopen)
+        var procs = _procs.Sample();
+        RefreshAdaptersIfNeeded(procs);
+
+        var wantGpu = DecideGpuConnection(procs);
+        if (_reopen || wantGpu != _gpuOpen)
         {
             _reopen = false;
+            _gpuOpen = wantGpu;
             _computer.Close();
-            _computer.Open();
+            _computer = OpenComputer(_gpuOpen);
         }
         foreach (var hw in _computer.Hardware)
         {
@@ -71,9 +100,6 @@ internal sealed class Collector : IDisposable
             hw.Update();
             foreach (var sub in hw.SubHardware) sub.Update();
         }
-
-        var procs = _procs.Sample();
-        RefreshAdaptersIfNeeded(procs);
 
         var cpu = BuildCpu(notes);
         var gpus = BuildGpus();
@@ -91,8 +117,35 @@ internal sealed class Collector : IDisposable
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             new MachineInfo(_machineName, _model, _os, Environment.TickCount64 / 1000, _elevated),
             cpu, gpus, fans, BuildMemory(), BuildBattery(), BuildDisks(), BuildNet(), procInfos, BuildSensors(), notes.ToArray());
-        return snap with { Power = _power.Build(snap, procs, _gpuLuids, PollDiscreteGpu, PathOf) };
+        return snap with { Power = _power.Build(snap, procs, _gpuLuids, _dgpuOn, _gpuOpen && UsersOfDgpu(procs).Count == 0, PathOf) };
     }
+
+    /// <summary>Apps (not Windows itself, not Thermal) holding real work or memory on the dedicated GPU.</summary>
+    private List<ProcRow> UsersOfDgpu(List<ProcRow> procs) =>
+        _dgpuLuid == "" ? new List<ProcRow>() : procs.Where(p =>
+            p.Pid != _self && p.Name != "Thermal" && !GpuPreference.IsSystem(p.Name, null)
+            && (p.VramByLuid.GetValueOrDefault(_dgpuLuid) > 1 << 20 || p.GpuByLuid.GetValueOrDefault(_dgpuLuid) > 0.5)).ToList();
+
+    /// <summary>
+    /// Connect to GPU sensors only while an app keeps the dedicated GPU awake anyway: after 2 s of use, and until it
+    /// has been unused for 20 s. Machines without a sleeping dedicated GPU stay connected.
+    /// </summary>
+    private bool DecideGpuConnection(List<ProcRow> procs)
+    {
+        if (_dgpuPower == null) { _dgpuOn = null; return true; }
+        _dgpuOn = _dgpuPower.IsOn();
+        var used = UsersOfDgpu(procs).Count > 0;
+        var now = DateTime.UtcNow;
+        if (used) { _dgpuUsedSince ??= now; _dgpuIdleSince = null; }
+        else { _dgpuIdleSince ??= now; _dgpuUsedSince = null; }
+
+        if (!PollDiscreteGpu) return false;
+        if (_gpuOpen) return !(_dgpuIdleSince != null && now - _dgpuIdleSince > TimeSpan.FromSeconds(20));
+        return _dgpuOn == true && _dgpuUsedSince != null && now - _dgpuUsedSince > TimeSpan.FromSeconds(2);
+    }
+
+    /// <summary>Whether Thermal is connected to the GPU sensors right now (shown in the UI).</summary>
+    public bool GpuSensorsConnected => _gpuOpen;
 
     // ---------- CPU ----------
 
@@ -167,7 +220,7 @@ internal sealed class Collector : IDisposable
                 h.HardwareType is HardwareType.GpuNvidia or HardwareType.GpuAmd or HardwareType.GpuIntel && Similar(h.Name, a.Name));
             var s = hw?.Sensors ?? Array.Empty<ISensor>();
             var isNvidia = a.VendorId == 0x10DE;
-            var polled = !(isNvidia && !PollDiscreteGpu);
+            var polled = _gpuOpen && !(isNvidia && !PollDiscreteGpu);
 
             var engines = _procs.AdapterEngines.GetValueOrDefault(a.Luid) ?? new Dictionary<string, double>();
             var engineArr = engines.OrderByDescending(e => e.Value).Select(e => new EngineLoad(e.Key, Math.Round(e.Value, 1))).ToArray();
@@ -200,7 +253,7 @@ internal sealed class Collector : IDisposable
                 memUsed, memTotal, mem.shared,
                 fan, polled ? R(Val(s, SensorType.Control, "GPU Fan")) : null,
                 engineArr,
-                polled || counterLoad > 0));
+                integrated ? true : _dgpuOn ?? (polled || counterLoad > 0)));
         }
         // Discrete first: it is the one that heats up.
         return list.OrderBy(g => g.Kind == "integrated").ToArray();
@@ -208,14 +261,18 @@ internal sealed class Collector : IDisposable
 
     private void RefreshAdaptersIfNeeded(List<ProcRow> procs)
     {
-        // The dGPU's LUID changes when Optimus power-cycles it; re-enumerate if a counter mentions one we don't know.
-        if (DateTime.UtcNow - _adaptersRefreshed < TimeSpan.FromSeconds(10)) return;
+        // Re-enumerate if real work shows up on an adapter we don't know (a driver reset can change a LUID). The counters
+        // also keep stale LUIDs with no work on them; those are ignored. Enumerating through DXGI wakes a sleeping
+        // hybrid-graphics GPU, so never do it while the dedicated GPU is asleep.
+        if (DateTime.UtcNow - _adaptersRefreshed < TimeSpan.FromSeconds(60) || _dgpuPower?.IsOn() == false) return;
         var known = _adapters.Select(a => a.Luid).ToHashSet();
-        if (_procs.AdapterEngines.Keys.Any(k => !known.Contains(k)) || procs.Any(p => p.GpuLuid != "" && !known.Contains(p.GpuLuid)))
+        if (_procs.AdapterEngines.Any(kv => !known.Contains(kv.Key) && kv.Value.Values.Any(v => v > 1)))
         {
             _adapters = Dxgi.Enumerate();
+            var discrete = _adapters.FirstOrDefault(a => a.DedicatedVideo >= 1UL << 30);
+            if (discrete != null) _dgpuLuid = discrete.Luid;
+            _adaptersRefreshed = DateTime.UtcNow;
         }
-        _adaptersRefreshed = DateTime.UtcNow;
     }
 
     // ---------- Fans ----------

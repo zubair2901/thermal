@@ -112,11 +112,12 @@ export default function GpuWake({
       <section className="callout">
         {gpu.wokenByThermal ? (
           <p>
-            <b>Thermal is keeping {name} awake</b> to read its temperature and clocks. No app needs it right now.{" "}
-            <button className="link" onClick={() => onReadSensors(false)}>
-              Stop reading its sensors
-            </button>{" "}
-            to let it sleep.
+            <b>No app is using {name} any more.</b> Thermal is still connected to its sensors and lets go within 20 seconds, then it can sleep.{" "}
+            {reading && (
+              <button className="link" onClick={() => onReadSensors(false)}>
+                Stop reading its sensors
+              </button>
+            )}
           </p>
         ) : (
           <p>
@@ -142,19 +143,6 @@ export default function GpuWake({
         {gpu.wakeApps.map((a) => (
           <WakeRow key={a.name} app={a} igpuName={igpuName} result={results[a.name]} />
         ))}
-        {reading && onBattery && (
-          <li className="wake">
-            <div className="wake-name">
-              Thermal
-              <p className="wake-status">Reading {name}'s temperature and clocks also keeps it awake. Per-app GPU use still works without it.</p>
-            </div>
-            <div className="wake-actions">
-              <button className="primary" onClick={() => onReadSensors(false)}>
-                Stop reading its sensors
-              </button>
-            </div>
-          </li>
-        )}
       </ul>
       <p className="muted">
         Games and 3D apps run slower on the {igpuName}. To undo a change, set the app back to High performance in{" "}

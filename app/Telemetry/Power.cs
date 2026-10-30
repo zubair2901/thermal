@@ -27,7 +27,7 @@ internal sealed class PowerModel
     private readonly int _self = Environment.ProcessId;
     private readonly BatteryHistory _history = new();
 
-    public PowerInfo Build(Snapshot s, List<ProcRow> procs, IReadOnlyDictionary<string, string> luidOfGpuId, bool pollingDgpu, Func<int, string?> pathOf)
+    public PowerInfo Build(Snapshot s, List<ProcRow> procs, IReadOnlyDictionary<string, string> luidOfGpuId, bool? dgpuOn, bool thermalHolding, Func<int, string?> pathOf)
     {
         var now = DateTime.UtcNow;
         var dt = Math.Min(5, (now - _last).TotalSeconds);
@@ -57,8 +57,9 @@ internal sealed class PowerModel
             if (g.Kind == "discrete")
             {
                 // On hybrid-graphics laptops the dedicated GPU powers off unless something holds memory or work on it.
+                // Ignore token allocations (a few KB): apps like the NVIDIA overlay keep them even while the GPU sleeps.
                 var holders = procs.Where(p => p.Pid != _self && p.Name != "Thermal"
-                                               && (p.VramByLuid.GetValueOrDefault(luid) > 0 || p.GpuByLuid.GetValueOrDefault(luid) > 0))
+                                               && (p.VramByLuid.GetValueOrDefault(luid) > 1 << 20 || p.GpuByLuid.GetValueOrDefault(luid) > 0.5))
                     .GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
                     .Select(grp => (name: grp.Key, path: grp.Select(p => pathOf(p.Pid)).FirstOrDefault(x => x != null), pid: grp.First().Pid))
                     .ToList();
@@ -77,9 +78,9 @@ internal sealed class PowerModel
                     })
                     .OrderBy(w => w.Title == "" ? w.Name : w.Title, StringComparer.OrdinalIgnoreCase)
                     .ToArray();
-                awake = holders.Count > 0 || pollingDgpu || (g.Power ?? 0) > 1;
+                awake = dgpuOn ?? (holders.Count > 0 || (g.Power ?? 0) > 1);
             }
-            gpuRows.Add(new GpuPower(g.Id, g.Name, g.Kind, g.Power, awake, wake, onlyWindows, g.Kind == "discrete" && pollingDgpu && wake.Length == 0 && !onlyWindows));
+            gpuRows.Add(new GpuPower(g.Id, g.Name, g.Kind, g.Power, awake, wake, onlyWindows, g.Kind == "discrete" && awake && thermalHolding && wake.Length == 0));
         }
 
         var gpuW = s.Gpus.Sum(g => g.Power ?? 0);

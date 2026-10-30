@@ -116,8 +116,8 @@ export default function SettingsView({ host, update }: { host: HostInfo; update:
         <Toggle
           checked={s.pollDgpu}
           onChange={(v) => update({ pollDgpu: v })}
-          label="Read the dedicated GPU's sensors"
-          hint="Reading them keeps the GPU awake. Turn off on battery to let it sleep; load and per-app GPU use still work."
+          label="Read the dedicated GPU's temperature and clocks while an app uses it"
+          hint="Thermal connects only after a game or app has woken the GPU, and lets go 20 seconds after it's done, so the GPU can still sleep."
         />
       </section>
 

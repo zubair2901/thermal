@@ -83,8 +83,10 @@ function GpuInstrument({ g, snap, history }: { g: Gpu; snap: Snapshot; history: 
       <p className="src">
         {g.temp == null
           ? g.kind === "discrete"
-            ? "Sensors paused, the GPU can sleep"
-            : "No temperature sensor exposed"
+            ? g.active
+              ? "Sensors connect while an app uses it"
+              : "Asleep, drawing no power"
+            : "Sensors connect while the dedicated GPU is in use"
           : g.hotspot != null
             ? `Hot spot ${Math.round(g.hotspot)} °C`
             : "Measured at the GPU core"}
