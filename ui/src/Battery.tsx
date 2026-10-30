@@ -15,6 +15,7 @@ export default function Battery({ snap, onReadSensors }: { snap: Snapshot; onRea
 
   const dgpu = p.gpus.find((g) => g.kind === "discrete");
   const igpu = p.gpus.find((g) => g.kind === "integrated");
+  const u = p.unplugged;
   const parts = [
     { label: "Processor", w: p.cpuW, cls: "cpu" },
     ...p.gpus.map((g) => ({ label: shortGpu(g.name, snap.cpu.name), w: g.watts, cls: g.kind === "discrete" ? "dgpu" : "igpu" })),
@@ -106,14 +107,43 @@ export default function Battery({ snap, onReadSensors }: { snap: Snapshot; onRea
         </section>
 
         <section className="panel">
-          <h3>{p.onBattery ? `Since you unplugged, ${hm(p.sinceMinutes)} ago` : "Last time on battery"}</h3>
-          {p.sinceWh == null ? (
-            <p className="empty">Unplug the charger and Thermal will add up how much energy each app uses.</p>
-          ) : (
+          {u ? (
             <>
+              <h3>
+                Unplugged at {new Date(u.at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, {hm((Date.now() - u.at) / 60000)} ago
+              </h3>
               <p className="big">
-                {num(p.sinceWh, 1)} <small>Wh used{p.health?.fullWh ? `, ${Math.round((100 * p.sinceWh) / p.health.fullWh)}% of a full charge` : ""}</small>
+                {num(u.usedWh, 1)}{" "}
+                <small>
+                  Wh used of the {num(u.chargeAtWh, 1)} Wh it had
+                  {p.health?.fullWh ? `, ${Math.round((100 * u.usedWh) / p.health.fullWh)}% of a full charge` : ""}
+                </small>
               </p>
+              <dl className="stats two">
+                <div className="stat">
+                  <dt>Awake</dt>
+                  <dd>
+                    {hm(u.awakeMinutes)}, {num(u.awakeWh, 1)} Wh
+                    {u.awakeMinutes > 5 && <small> avg {num(u.awakeWh / (u.awakeMinutes / 60), 1)} W</small>}
+                  </dd>
+                </div>
+                <div className="stat">
+                  <dt>Asleep</dt>
+                  <dd>
+                    {hm(u.asleepMinutes)}, {num(u.asleepWh, 1)} Wh
+                    {u.asleepMinutes > 5 && <small> avg {num(u.asleepWh / (u.asleepMinutes / 60), 1)} W</small>}
+                  </dd>
+                </div>
+              </dl>
+            </>
+          ) : (
+            <h3>{p.onBattery ? "Since you unplugged" : "On battery"}</h3>
+          )}
+          {!p.onBattery && <p className="empty">Unplug the charger and this shows when you unplugged, how much charge you have used, and which apps used it.</p>}
+          {p.onBattery && !u && <p className="muted">Reading the battery history Windows keeps…</p>}
+          {p.sinceWh != null && p.sinceApps.length > 0 && (
+            <>
+              <h4 className="sub-h">By app, while Thermal was running ({hm(p.sinceMinutes)})</h4>
               <ol className="memtop">
                 {p.sinceApps.map((a) => (
                   <li key={a.name}>

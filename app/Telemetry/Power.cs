@@ -9,7 +9,7 @@ public record GpuPower(string Id, string Name, string Kind, double? Watts, bool 
 public record BatteryHealth(double? DesignWh, double? FullWh, double? WearPct, int? Cycles);
 public record PowerInfo(
     bool OnBattery, double? DrainW, double? CpuW, GpuPower[] Gpus, double? RestW, AppPower[] Apps,
-    double SinceMinutes, double? SinceWh, AppPower[] SinceApps, BatteryHealth? Health);
+    double SinceMinutes, double? SinceWh, AppPower[] SinceApps, BatteryHealth? Health, UnplugInfo? Unplugged);
 
 /// <summary>
 /// Windows has no live per-app power meter, so this splits the measured CPU package power and each GPU's power
@@ -25,6 +25,7 @@ internal sealed class PowerModel
     private BatteryHealth? _health;
     private DateTime _healthRead = DateTime.MinValue;
     private readonly int _self = Environment.ProcessId;
+    private readonly BatteryHistory _history = new();
 
     public PowerInfo Build(Snapshot s, List<ProcRow> procs, IReadOnlyDictionary<string, string> luidOfGpuId, bool pollingDgpu, Func<int, string?> pathOf)
     {
@@ -118,7 +119,7 @@ internal sealed class PowerModel
         if (now - _healthRead > TimeSpan.FromMinutes(5)) { _health = ReadHealth(); _healthRead = now; }
 
         return new PowerInfo(onBattery, Round(drain), Round(cpuW), gpuRows.ToArray(), Round(rest), apps.Take(12).ToArray(),
-            Math.Round(_sinceSeconds / 60, 1), _sinceSeconds > 0 ? Math.Round(_sinceWh, 2) : null, sinceApps, _health);
+            Math.Round(_sinceSeconds / 60, 1), _sinceSeconds > 0 ? Math.Round(_sinceWh, 2) : null, sinceApps, _health, _history.Get(onBattery));
     }
 
     private static double? Round(double? v) => v == null ? null : Math.Round(v.Value, 2);

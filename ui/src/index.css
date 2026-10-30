@@ -1204,6 +1204,13 @@ legend {
   color: var(--text-2);
 }
 
+.sub-h {
+  font-size: var(--step--1);
+  font-weight: 500;
+  color: var(--text-2);
+  margin: 6px 0 0;
+}
+
 .footnote {
   color: var(--text-3);
   font-size: var(--step--1);

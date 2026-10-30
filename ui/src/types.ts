@@ -125,6 +125,7 @@ export interface PowerInfo {
   sinceMinutes: number;
   sinceWh: Nullable<number>;
   sinceApps: AppPower[];
+  unplugged: Nullable<{ at: number; chargeAtWh: number; usedWh: number; awakeMinutes: number; awakeWh: number; asleepMinutes: number; asleepWh: number }>;
   health: Nullable<{ designWh: Nullable<number>; fullWh: Nullable<number>; wearPct: Nullable<number>; cycles: Nullable<number> }>;
 }
 

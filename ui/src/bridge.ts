@@ -114,6 +114,7 @@ function mock(): Snapshot {
         { name: "Code", title: "Visual Studio Code", share: 0.15, watts: null, cpuW: null, gpuW: null, wh: 2.8 },
         { name: "steamwebhelper", title: "Steam Client WebHelper", share: 0.12, watts: null, cpuW: null, gpuW: null, wh: 2.2 },
       ],
+      unplugged: { at: Date.now() - 290 * 60000, chargeAtWh: 42.9, usedWh: 25.6, awakeMinutes: 98, awakeWh: 22.7, asleepMinutes: 190, asleepWh: 2.9 },
       health: { designWh: 70, fullWh: 65.5, wearPct: 6.4, cycles: 112 },
     },
   };
