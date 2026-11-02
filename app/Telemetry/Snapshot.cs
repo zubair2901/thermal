@@ -13,11 +13,11 @@ public record MemoryInfo(double Used, double Total, double Committed, double Com
 public record BatteryInfo(double Charge, double? RateW, bool OnAc, double? MinutesLeft, double? Wear);
 public record DiskInfo(string Name, double Read, double Write, double? Activity, double? Temp);
 public record NetInfo(string Name, double Up, double Down);
-public record ProcInfo(int Pid, string Name, string Title, double Cpu, long Ram, long Commit, double Gpu, string GpuName, string GpuEngine, long Vram, long Io, int Threads);
+public record ProcInfo(int Pid, string Name, string App, string? AppPath, string Title, double Cpu, long Ram, long Commit, double Gpu, string GpuName, string GpuEngine, long Vram, long Io, int Threads);
 public record Note(string Id, string Text, string? Action = null);
 public record SensorInfo(string Hw, string Type, string Name, double? Value, double? Min, double? Max);
 
 public record Snapshot(
     long T, MachineInfo Machine, CpuInfo Cpu, GpuInfo[] Gpus, FanInfo[] Fans, MemoryInfo Memory, BatteryInfo? Battery,
     DiskInfo[] Disks, NetInfo[] Net, ProcInfo[] Processes, SensorInfo[] Sensors, Note[] Notes,
-    FpsInfo? Fps = null, RecordingInfo? Recording = null, PowerInfo? Power = null, bool GpuSensorsConnected = true);
+    FpsInfo? Fps = null, RecordingInfo? Recording = null, PowerInfo? Power = null, bool GpuSensorsConnected = true, MemoryDetail? MemoryDetail = null);

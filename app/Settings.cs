@@ -21,6 +21,7 @@ public sealed class Settings
     public bool AlertsEnabled { get; set; } = true;
     public double CpuTempAlert { get; set; } = 95;
     public double GpuTempAlert { get; set; } = 87;
+    public double MemoryAlert { get; set; } = 90;
     public int AlertSeconds { get; set; } = 30;
 
     public bool CloseToTray { get; set; } = true;

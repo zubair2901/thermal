@@ -37,13 +37,13 @@ function group(procs: Proc[], byApp: boolean, cpuName: string): Row[] {
     }));
   const m = new Map<string, Row>();
   for (const p of procs) {
-    const k = p.name.toLowerCase();
+    const k = `${p.app}|${p.appPath}`.toLowerCase();
     const r = m.get(k);
     if (!r) {
       m.set(k, {
         id: k,
-        name: p.title || p.name,
-        exe: p.name,
+        name: p.name === p.app ? p.title || p.name : p.app,
+        exe: p.app,
         pids: [p.pid],
         cpu: p.cpu,
         ram: p.ram,
@@ -64,7 +64,8 @@ function group(procs: Proc[], byApp: boolean, cpuName: string): Row[] {
       r.vram += p.vram;
       r.io += p.io;
       r.threads += p.threads;
-      if (!r.name && p.title) r.name = p.title;
+      // The app's own process names the row, not a helper seen first.
+      if (p.name === p.app && p.title) r.name = p.title;
     }
   }
   return [...m.values()];

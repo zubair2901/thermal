@@ -72,6 +72,8 @@ function mock(): Snapshot {
     processes: names.map((n, i) => ({
       pid: 1000 + i * 37,
       name: n,
+      app: n,
+      appPath: null,
       title: "",
       cpu: wave(3 + i, 0, 24 / (i + 1)),
       ram: (2.4 / (i + 1)) * GB,
@@ -92,6 +94,24 @@ function mock(): Snapshot {
     fps: phase % 40 < 25 ? { pid: 4412, name: "cyberpunk2077", fps: wave(4, 88, 40), frameTimeMs: 8.4, low1: 71 } : null,
     recording: null,
     gpuSensorsConnected: true,
+    memoryDetail: {
+      installed: 16 * GB,
+      reserved: 2.5 * GB,
+      available: 2.9 * GB,
+      appBytes: 7.4 * GB,
+      compressed: 0.9 * GB,
+      kernel: 0.8 * GB,
+      graphics: 0.7 * GB,
+      other: 0.8 * GB,
+      cached: 2.4 * GB,
+      free: 0.5 * GB,
+      pressure: "tight",
+      apps: [
+        { name: "chrome", title: "Google Chrome", bytes: 2.8 * GB, processes: 23, kind: "browser", roles: [{ name: "Pages", count: 12, bytes: 1.9 * GB }, { name: "Graphics", count: 1, bytes: 0.4 * GB }, { name: "Extensions", count: 5, bytes: 0.3 * GB }, { name: "Main app", count: 1, bytes: 0.15 * GB }, { name: "Helpers", count: 4, bytes: 0.05 * GB }], growth: 0, growthMinutes: 0, path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", appId: null, canClose: true },
+        { name: "WhatsApp.Root", title: "WhatsApp", bytes: 1.1 * GB, processes: 10, kind: "webapp", roles: [{ name: "Pages", count: 2, bytes: 0.55 * GB }, { name: "Graphics", count: 1, bytes: 0.3 * GB }, { name: "Main app", count: 2, bytes: 0.22 * GB }, { name: "Helpers", count: 5, bytes: 0.03 * GB }], growth: 0.46 * GB, growthMinutes: 28, path: "C:\\Program Files\\WindowsApps\\5319275A.WhatsAppDesktop_2.0_x64__cv1g1gvanyjgm\\WhatsApp.Root.exe", appId: "5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App", canClose: true },
+        { name: "dwm", title: "Desktop Window Manager", bytes: 0.47 * GB, processes: 1, kind: "app", roles: [], growth: 0, growthMinutes: 0, path: "C:\\Windows\\System32\\dwm.exe", appId: null, canClose: false },
+      ],
+    },
     power: {
       onBattery: true,
       drainW: 24.6,

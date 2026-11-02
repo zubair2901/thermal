@@ -132,13 +132,13 @@ internal sealed class MainForm : Form
         finally { Interlocked.Exchange(ref _busy, 0); }
     }
 
-    private void Render(Snapshot snap, List<string> alerts)
+    private void Render(Snapshot snap, List<(string title, string text)> alerts)
     {
         try { RenderCore(snap, alerts); }
         catch (Exception ex) { Log(ex); }
     }
 
-    private void RenderCore(Snapshot snap, List<string> alerts)
+    private void RenderCore(Snapshot snap, List<(string title, string text)> alerts)
     {
         // Serialising ~500 processes every second is the main cost of the window; skip it while it's hidden.
         if (_ready && Visible && WindowState != FormWindowState.Minimized)
@@ -148,7 +148,7 @@ internal sealed class MainForm : Form
         var gpu = snap.Gpus.FirstOrDefault(g => g.Kind == "discrete") ?? snap.Gpus.FirstOrDefault();
         _tray.Update(snap.Cpu.Temp, $"Thermal\nCPU {Deg(snap.Cpu.Temp)}, {snap.Cpu.Load:0}% load" + (gpu != null ? $"\nGPU {Deg(gpu.Temp)}, {gpu.Load:0}% load" : ""), _settings.TrayTemperature);
         _tray.Record.Text = _recorder.Active ? "Stop recording" : "Start recording";
-        foreach (var a in alerts) _tray.Notify("Running hot", a);
+        foreach (var (title, text) in alerts) _tray.Notify(title, text);
     }
 
     private static string Deg(double? t) => t == null ? "–" : $"{t:0} °C";
@@ -206,9 +206,16 @@ internal sealed class MainForm : Form
             case "closeApp":
             {
                 var n = root.GetProperty("name").GetString()!;
-                Post(new { type = "appAction", name = n, action = "close", error = GpuPreference.Close(n) });
+                var closePath = root.TryGetProperty("path", out var pp) ? pp.GetString() : null;
+                Post(new { type = "appAction", name = n, action = "close", error = GpuPreference.Close(n, closePath) });
                 break;
             }
+            case "startupApps":
+                PostStartupApps();
+                break;
+            case "startupSet":
+                PostStartupApps(StartupApps.Set(root.GetProperty("id").GetString()!, root.GetProperty("enabled").GetBoolean()));
+                break;
             case "graphicsSettings":
                 Process.Start(new ProcessStartInfo("ms-settings:display-advancedgraphics") { UseShellExecute = true });
                 break;
@@ -248,6 +255,12 @@ internal sealed class MainForm : Form
                 .ToArray()
             : Array.Empty<object>();
         Post(new { type = "sessions", files });
+    }
+
+    private void PostStartupApps(string? error = null)
+    {
+        try { Post(new { type = "startupApps", apps = _collector?.StartupApps() ?? Array.Empty<StartupApp>(), error }); }
+        catch (Exception ex) { Log(ex); }
     }
 
     private void ToggleRecording()

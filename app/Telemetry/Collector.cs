@@ -22,6 +22,7 @@ internal sealed class Collector : IDisposable
     private readonly HpBios _hp;
     private readonly ProcessSampler _procs = new();
     private readonly PowerModel _power = new();
+    private readonly MemoryModel _memory = new();
     private readonly Dictionary<string, string> _gpuLuids = new();
     private readonly Dictionary<int, string> _descriptions = new();
     private readonly PerformanceCounter? _cpuPerf;
@@ -159,6 +160,7 @@ internal sealed class Collector : IDisposable
     {
         var notes = new List<Note>();
         var procs = _procs.Sample();
+        _memory.Attribute(procs);
         RefreshAdaptersIfNeeded(procs);
 
         var wantGpu = DecideGpuConnection(procs);
@@ -183,22 +185,24 @@ internal sealed class Collector : IDisposable
 
         var adapterNames = _adapters.ToDictionary(a => a.Luid, a => a.Name);
         var procInfos = procs
-            .Select(p => new ProcInfo(p.Pid, p.Name, Describe(p.Pid), Math.Round(p.Cpu, 2), p.Ram, p.Commit, Math.Round(p.Gpu, 2),
+            .Select(p => new ProcInfo(p.Pid, p.Name, p.Owner, p.OwnerPath, Describe(p.Pid), Math.Round(p.Cpu, 2), p.Ram, p.Commit, Math.Round(p.Gpu, 2),
                 adapterNames.GetValueOrDefault(p.GpuLuid, p.GpuLuid == "" ? "" : "GPU"), p.GpuEngine, p.Vram, p.Io, p.Threads))
             .ToArray();
+        var memory = BuildMemory();
+        var memoryDetail = _memory.Build(memory, procs, _procs.AdapterMemory.Values, Describe, PathOf);
         PruneDescriptions(procs);
 
         var snap = new Snapshot(
             DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             new MachineInfo(_machineName, _model, _os, Environment.TickCount64 / 1000, _elevated),
-            cpu, gpus, fans, BuildMemory(), BuildBattery(), BuildDisks(), BuildNet(), procInfos, BuildSensors(), notes.ToArray());
-        return snap with { GpuSensorsConnected = _gpuOpen, Power = _power.Build(snap, procs, _gpuLuids, _dgpuOn, _gpuOpen && UsersOfDgpu(procs).Count == 0, PathOf) };
+            cpu, gpus, fans, memory, BuildBattery(), BuildDisks(), BuildNet(), procInfos, BuildSensors(), notes.ToArray());
+        return snap with { GpuSensorsConnected = _gpuOpen, MemoryDetail = memoryDetail, Power = _power.Build(snap, procs, _gpuLuids, _dgpuOn, _gpuOpen && UsersOfDgpu(procs).Count == 0, PathOf) };
     }
 
     /// <summary>Apps (not Windows itself, not Thermal) holding real work or memory on the dedicated GPU.</summary>
     private List<ProcRow> UsersOfDgpu(List<ProcRow> procs) =>
         _dgpuLuid == "" ? new List<ProcRow>() : procs.Where(p =>
-            p.Pid != _self && p.Name != "Thermal" && !GpuPreference.IsSystem(p.Name, null)
+            p.Pid != _self && p.Owner != "Thermal" && !GpuPreference.IsSystem(p.Name, null)
             && (p.VramByLuid.GetValueOrDefault(_dgpuLuid) > 1 << 20 || p.GpuByLuid.GetValueOrDefault(_dgpuLuid) > 0.5)).ToList();
 
     /// <summary>
@@ -423,6 +427,8 @@ internal sealed class Collector : IDisposable
 
     // ---------- Actions ----------
 
+    public StartupApp[] StartupApps() => Telemetry.StartupApps.List(_memory.Running);
+
     public string? Kill(int pid)
     {
         try
@@ -460,9 +466,7 @@ internal sealed class Collector : IDisposable
     private string? PathOf(int pid)
     {
         if (_paths.TryGetValue(pid, out var p)) return p;
-        try { using var proc = Process.GetProcessById(pid); p = proc.MainModule?.FileName; }
-        catch { p = null; }
-        return _paths[pid] = p;
+        return _paths[pid] = GpuPreference.ImagePath(pid);
     }
 
     private string Describe(int pid)

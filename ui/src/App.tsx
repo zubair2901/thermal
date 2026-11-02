@@ -5,21 +5,23 @@ import { useTelemetry } from "./history";
 import { useHost } from "./host";
 import Overview from "./Overview";
 import Battery from "./Battery";
+import Memory from "./Memory";
 import Processes from "./Processes";
 import Sensors from "./Sensors";
 import Sessions from "./Sessions";
 import SettingsView from "./SettingsView";
 import type { Note } from "./types";
 
-type View = "overview" | "processes" | "battery" | "sensors" | "sessions" | "settings";
+type View = "overview" | "processes" | "memory" | "battery" | "sensors" | "sessions" | "settings";
 
 const VIEWS: { id: View; label: string; key: string }[] = [
   { id: "overview", label: "Overview", key: "1" },
   { id: "processes", label: "Processes", key: "2" },
-  { id: "battery", label: "Battery", key: "3" },
-  { id: "sensors", label: "All sensors", key: "4" },
-  { id: "sessions", label: "Sessions", key: "5" },
-  { id: "settings", label: "Settings", key: "6" },
+  { id: "memory", label: "Memory", key: "3" },
+  { id: "battery", label: "Battery", key: "4" },
+  { id: "sensors", label: "All sensors", key: "5" },
+  { id: "sessions", label: "Sessions", key: "6" },
+  { id: "settings", label: "Settings", key: "7" },
 ];
 
 function load<T>(k: string, d: T): T {
@@ -166,6 +168,7 @@ export default function App() {
 
             {view === "overview" && <Overview snap={snap} history={history} onOpenProcesses={() => setView("processes")} />}
             {view === "processes" && <Processes snap={snap} />}
+            {view === "memory" && <Memory snap={snap} />}
             {view === "battery" && <Battery snap={snap} reading={host?.settings.pollDgpu ?? false} onReadSensors={(v) => updateSettings({ pollDgpu: v })} />}
             {view === "sensors" && <Sensors snap={snap} />}
             {view === "sessions" && host && <Sessions snap={snap} host={host} />}

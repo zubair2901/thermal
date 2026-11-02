@@ -1,6 +1,6 @@
 # Thermal
 
-A hardware monitor for Windows laptops. It shows temperatures, fan speeds, both GPUs side by side, which app is using which GPU, where your battery is going, and a frame-rate overlay for games.
+A hardware monitor for Windows laptops. It shows temperatures, fan speeds, both GPUs side by side, which app is using which GPU, where your memory and battery are going, and a frame-rate overlay for games.
 
 It was built and tested on an HP Victus 15 (Ryzen 7 8845HS, RTX 4060 Laptop, Radeon 780M). It runs on any 64-bit Windows 10 or 11 PC; how many sensors it can read depends on the hardware, see [Will it work on my PC?](#will-it-work-on-my-pc)
 
@@ -67,9 +67,12 @@ LibreHardwareMonitor reads the CPU die temperature and package power through the
 
 - **Overview**: CPU and each GPU with temperature, load, clocks, power and fan speed; load per CPU thread; GPU load per engine (3D, copy, video); VRAM; a five-minute heat history of every sensor; memory, storage, network and the apps doing the most work.
 - **Processes**: CPU, memory, GPU load and which GPU it runs on, GPU memory, disk I/O and threads per app. Group by app, sort, filter, end task.
+- **Memory**: whether you're actually short of memory; where all of it goes, including the parts Task Manager's list doesn't show (compressed, drivers, graphics, reserved by hardware); the biggest apps, split into pages, extensions, graphics and helpers for browsers and apps built on a browser engine, with Restart and Close buttons that report what came back; apps that keep climbing over time; and which apps start with Windows, with a switch for each.
 - **Battery**: current drain in watts and time left; how the power splits between CPU, each GPU and the rest of the laptop; estimated watts per app; energy each app used since you unplugged; which apps keep the dedicated GPU awake; battery wear and charge cycles.
 - **All sensors**: every reading LibreHardwareMonitor exposes, with lowest and highest values.
 - **Sessions**: record a game or workload to CSV, one row per second, and see lowest, average and highest for each reading.
+
+Thermal can't name individual browser tabs, because browsers don't share that with other apps; Chrome and Edge show it in their own task manager (Shift+Esc). There's deliberately no "clean memory" button: those tools only push apps out to disk, which slows them down.
 
 Windows doesn't measure power per app, so Thermal splits the measured CPU and GPU power between apps by their share of processor and graphics time. Treat per-app watts as estimates.
 
@@ -78,7 +81,7 @@ Windows doesn't measure power per app, so Thermal splits the measured CPU and GP
 - **Game overlay**: click-through readout of frame rate (with 1% low and frame time), CPU, GPU, VRAM, fans, memory and battery. Toggle it with **Ctrl+Shift+O**, or choose another shortcut, corner, size and lines in Settings. It shows over windowed and borderless games; games in exclusive fullscreen hide every overlay, including this one.
 - **Frame rate** comes from the DXGI and Direct3D 9 present events (the same ETW events PresentMon reads), for whichever app is in the foreground. It covers DirectX 9 to 12 games, and Vulkan or OpenGL games that present through DXGI.
 - **Desktop widget**: drag it anywhere, right-click for options, double-click to open Thermal.
-- **Alerts**: a Windows notification when the CPU or a GPU stays above its limit (95 °C and 87 °C for 30 seconds by default), naming the busiest app.
+- **Alerts**: a Windows notification when the CPU or a GPU stays above its limit (95 °C and 87 °C for 30 seconds by default), naming the busiest app, or when memory stays over 90% full, naming the biggest app.
 - **Tray**: the tray icon shows the CPU temperature. Closing the window keeps Thermal running in the tray; right-click the icon and choose **Exit** to quit. **Start with Windows** adds a logon task, so Thermal starts in the tray without an administrator prompt.
 - **Read the dedicated GPU's sensors**: reading the RTX through NVAPI keeps it awake. Turn this off on battery and the GPU can sleep; load and per-app GPU use still come from Windows' own counters.
 
@@ -92,6 +95,7 @@ Windows doesn't measure power per app, so Thermal splits the measured CPU and GP
 | Per-app GPU | `app/Telemetry/Counters.cs`, `Dxgi.cs` | "GPU Engine" and "GPU Process Memory" performance counters, mapped to adapters through DXGI LUIDs. |
 | Frame rate | `app/Telemetry/Fps.cs` | Real-time ETW session on the DXGI and D3D9 providers. |
 | Battery | `app/Telemetry/Power.cs` | Per-app power attribution, energy since unplugged, battery health from WMI. |
+| Memory | `app/Telemetry/Memory.cs`, `StartupApps.cs` | Groups helper processes under their app, reads each process's role from its command line, itemises physical memory, tracks growth, and lists startup apps. |
 | Sessions, alerts | `app/Telemetry/Recorder.cs`, `Alerts.cs` | CSV logging with min/avg/max; sustained-temperature notifications. |
 | Overlay, widget, tray | `app/Hud.cs`, `app/Tray.cs` | Native layered windows drawn with GDI+, so they cost little while gaming. |
 | UI | `ui/` | React, TypeScript and Vite. Charts are drawn on canvas; Archivo variable font. |

@@ -2,7 +2,7 @@ namespace Thermal.Telemetry;
 
 /// <summary>
 /// Raises a notification when a temperature stays at or above its limit for the configured time, then stays quiet
-/// until it has dropped 5 °C below the limit.
+/// until it has dropped 5 °C below the limit. Memory works the same way, in percent.
 /// </summary>
 internal sealed class Alerts
 {
@@ -14,19 +14,27 @@ internal sealed class Alerts
 
     private readonly Dictionary<string, Rule> _rules = new();
 
-    public IEnumerable<string> Evaluate(Snapshot s, Settings settings)
+    public IEnumerable<(string title, string text)> Evaluate(Snapshot s, Settings settings)
     {
         if (!settings.AlertsEnabled) yield break;
         var heaviest = s.Processes.OrderByDescending(p => p.Cpu + p.Gpu).FirstOrDefault();
         var culprit = heaviest == null ? "" : $" Busiest app: {(heaviest.Title != "" ? heaviest.Title : heaviest.Name)}.";
 
         var cpu = Check("cpu", s.Cpu.Temp, settings.CpuTempAlert, settings.AlertSeconds);
-        if (cpu) yield return $"CPU has been at {s.Cpu.Temp:0} °C for {settings.AlertSeconds} seconds.{culprit}";
+        if (cpu) yield return ("Running hot", $"CPU has been at {s.Cpu.Temp:0} °C for {settings.AlertSeconds} seconds.{culprit}");
 
         foreach (var g in s.Gpus)
         {
             if (Check(g.Id, g.Temp, settings.GpuTempAlert, settings.AlertSeconds))
-                yield return $"{g.Name} has been at {g.Temp:0} °C for {settings.AlertSeconds} seconds.{culprit}";
+                yield return ("Running hot", $"{g.Name} has been at {g.Temp:0} °C for {settings.AlertSeconds} seconds.{culprit}");
+        }
+
+        var used = 100 * s.Memory.Used / s.Memory.Total;
+        if (Check("memory", used, settings.MemoryAlert, settings.AlertSeconds))
+        {
+            var top = s.MemoryDetail?.Apps.FirstOrDefault();
+            var biggest = top == null ? "" : $" Biggest app: {top.Title}, {top.Bytes / 1073741824.0:0.0} GB.";
+            yield return ("Running out of memory", $"Memory has been {used:0}% full for {settings.AlertSeconds} seconds.{biggest}");
         }
     }
 

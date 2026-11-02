@@ -36,6 +36,13 @@ internal sealed class CategoryReader
 
 internal sealed record ProcRow(int Pid, string Name, double Cpu, long Ram, long Commit, long Io, int Threads)
 {
+    public int Parent { get; init; }
+    /// <summary>The app this process belongs to: its own name, or the app that started it for embedded browser engines.</summary>
+    public string Owner { get; set; } = Name;
+    /// <summary>Where the owning app's program lives, which tells apart different programs with the same name.</summary>
+    public string? OwnerPath { get; set; }
+    /// <summary>What a browser-engine process does ("Pages", "Graphics" and so on); empty for anything else.</summary>
+    public string Role { get; set; } = "";
     public double Gpu { get; set; }
     public string GpuLuid { get; set; } = "";
     public string GpuEngine { get; set; } = "";
@@ -78,7 +85,7 @@ internal sealed class ProcessSampler
                     CategoryReader.Raw(now, "Working Set - Private", key),
                     CategoryReader.Raw(now, "Private Bytes", key),
                     (long)CategoryReader.Rate(now, prev, "IO Data Bytes/sec", key),
-                    (int)CategoryReader.Raw(now, "Thread Count", key));
+                    (int)CategoryReader.Raw(now, "Thread Count", key)) { Parent = (int)CategoryReader.Raw(now, "Creating Process ID", key) };
             }
         }
 

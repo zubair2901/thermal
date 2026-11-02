@@ -1225,6 +1225,130 @@ legend {
   margin: 6px 0 0;
 }
 
+/* ---------- Memory ---------- */
+
+.m-apps {
+  background: #4fa3d9;
+}
+
+.m-comp {
+  background: #3f6f93;
+}
+
+.m-kernel {
+  background: #f0b03f;
+}
+
+.m-gpu {
+  background: #ec7036;
+}
+
+.m-other {
+  background: #5f6a80;
+}
+
+.m-cache {
+  background: #3a4560;
+}
+
+.m-free {
+  background: #273044;
+}
+
+.m-hw {
+  background: repeating-linear-gradient(135deg, #3a4560 0 3px, #273044 3px 6px);
+}
+
+.mem-parts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.mem-parts li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.mem-parts i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+
+.mem-parts small {
+  display: block;
+}
+
+.mem-parts b {
+  font-weight: 600;
+}
+
+.mem-app .wake-name {
+  position: relative;
+  flex: 1;
+  padding-top: 2px;
+}
+
+.mem-app .app-bar {
+  top: 0;
+  bottom: auto;
+  height: 22px;
+  background: rgba(79, 163, 217, 0.16);
+}
+
+.mem-app .app-name,
+.mem-app .wake-status {
+  display: block;
+  position: relative;
+  max-width: 100ch;
+}
+
+.mem-size {
+  font-weight: 600;
+  margin-left: 6px;
+}
+
+.wake-status.climb {
+  color: var(--warm);
+}
+
+.startup {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 4px 32px;
+  max-width: 900px;
+}
+
+.startup li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.startup .check {
+  color: var(--text);
+  min-width: 0;
+}
+
+.startup .check span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.startup .muted {
+  flex: none;
+  font-size: var(--step--1);
+}
+
 .footnote {
   color: var(--text-3);
   font-size: var(--step--1);

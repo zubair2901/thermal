@@ -38,6 +38,19 @@ internal static class GpuPreference
 
     public static bool IsPackaged(string path) => path.Contains(@"\WindowsApps\", StringComparison.OrdinalIgnoreCase);
 
+    public static string? ImagePath(int pid)
+    {
+        var h = OpenProcess(0x1000 /* QUERY_LIMITED_INFORMATION */, false, pid);
+        if (h == IntPtr.Zero) return null;
+        try
+        {
+            var len = 1024;
+            var sb = new System.Text.StringBuilder(len);
+            return QueryFullProcessImageName(h, 0, sb, ref len) ? sb.ToString() : null;
+        }
+        finally { CloseHandle(h); }
+    }
+
     /// <summary>App user model ID of a running Store app, e.g. "OpenAI.ChatGPT-Desktop_2p2nqsd0c76g0!ChatGPT".</summary>
     public static string? AppIdOf(int pid)
     {
@@ -56,6 +69,8 @@ internal static class GpuPreference
     [System.Runtime.InteropServices.DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr h);
     [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     private static extern int GetApplicationUserModelId(IntPtr process, ref uint length, System.Text.StringBuilder id);
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, EntryPoint = "QueryFullProcessImageNameW")]
+    private static extern bool QueryFullProcessImageName(IntPtr process, int flags, System.Text.StringBuilder path, ref int size);
 
     // Core Windows processes that can hold the GPU but can't be changed or closed.
     private static readonly HashSet<string> SystemNames = new(StringComparer.OrdinalIgnoreCase)
@@ -70,7 +85,7 @@ internal static class GpuPreference
     /// <summary>Close every process of an app and start it again as the signed-in user, not elevated like Thermal.</summary>
     public static string? Restart(string name, string path, string? appId)
     {
-        var error = Close(name);
+        var error = Close(name, path);
         if (error != null) return error;
         try
         {
@@ -83,11 +98,13 @@ internal static class GpuPreference
         catch (Exception e) { return e.Message; }
     }
 
-    public static string? Close(string name)
+    /// <summary>With a path, only that program closes: unrelated programs can share a name (Claude Desktop and Claude Code do).</summary>
+    public static string? Close(string name, string? path = null)
     {
         if (string.Equals(name, "Thermal", StringComparison.OrdinalIgnoreCase)) return "Thermal can't close itself here.";
         var failed = 0;
-        var procs = Process.GetProcessesByName(name);
+        var procs = Process.GetProcessesByName(name)
+            .Where(p => path == null || string.Equals(ImagePath(p.Id), path, StringComparison.OrdinalIgnoreCase)).ToArray();
         foreach (var p in procs)
         {
             try { p.Kill(); p.WaitForExit(3000); }

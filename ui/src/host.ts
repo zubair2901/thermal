@@ -15,6 +15,7 @@ const PREVIEW: HostInfo = {
     alertsEnabled: true,
     cpuTempAlert: 95,
     gpuTempAlert: 87,
+    memoryAlert: 90,
     alertSeconds: 30,
     closeToTray: true,
     startWithWindows: false,

@@ -38,7 +38,7 @@ function WakeRow({ app, igpuName, result }: { app: WakeApp; igpuName: string; re
             <button
               className="danger"
               onClick={() => {
-                send(confirm === "restart" ? { type: "restartApp", name: app.name, path: app.path, appId: app.appId } : { type: "closeApp", name: app.name });
+                send(confirm === "restart" ? { type: "restartApp", name: app.name, path: app.path, appId: app.appId } : { type: "closeApp", name: app.name, path: app.path });
                 setConfirm(null);
               }}
             >
@@ -141,7 +141,7 @@ export default function GpuWake({
       </p>
       <ul className="wakes">
         {gpu.wakeApps.map((a) => (
-          <WakeRow key={a.name} app={a} igpuName={igpuName} result={results[a.name]} />
+          <WakeRow key={`${a.name}|${a.path}`} app={a} igpuName={igpuName} result={results[a.name]} />
         ))}
       </ul>
       <p className="muted">

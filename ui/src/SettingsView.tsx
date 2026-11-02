@@ -101,10 +101,11 @@ export default function SettingsView({ host, update }: { host: HostInfo; update:
 
       <section>
         <h3>Alerts</h3>
-        <p className="lead">A Windows notification when a temperature stays at or above its limit. It won't repeat until the part has cooled 5 °C below the limit.</p>
-        <Toggle checked={s.alertsEnabled} onChange={(v) => update({ alertsEnabled: v })} label="Notify me when the laptop runs hot" />
+        <p className="lead">A Windows notification when a temperature or memory use stays at or above its limit. It won't repeat until it has dropped 5 below the limit.</p>
+        <Toggle checked={s.alertsEnabled} onChange={(v) => update({ alertsEnabled: v })} label="Notify me when the laptop runs hot or low on memory" />
         <NumberField label="CPU limit" unit="°C" min={60} max={105} value={s.cpuTempAlert} onChange={(v) => update({ cpuTempAlert: v })} />
         <NumberField label="GPU limit" unit="°C" min={60} max={100} value={s.gpuTempAlert} onChange={(v) => update({ gpuTempAlert: v })} />
+        <NumberField label="Memory limit" unit="% full" min={50} max={99} value={s.memoryAlert} onChange={(v) => update({ memoryAlert: v })} />
         <NumberField label="For at least" unit="seconds" min={5} max={600} value={s.alertSeconds} onChange={(v) => update({ alertSeconds: v })} />
       </section>
 

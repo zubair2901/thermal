@@ -29,6 +29,8 @@ export interface Fan {
 export interface Proc {
   pid: number;
   name: string;
+  app: string; // the app it belongs to: its own name, or the app that started an embedded browser engine
+  appPath: Nullable<string>; // that app's program, which tells apart different programs with the same name
   title: string;
   cpu: number; // % of whole machine
   ram: number; // private working set, bytes
@@ -96,6 +98,45 @@ export interface Snapshot {
   power: Nullable<PowerInfo>;
   /** False while Thermal is disconnected from GPU sensors so the dedicated GPU can sleep. */
   gpuSensorsConnected: boolean;
+  memoryDetail: Nullable<MemoryDetail>;
+}
+
+export interface MemoryApp {
+  name: string;
+  title: string;
+  bytes: number;
+  processes: number;
+  kind: "browser" | "webapp" | "app";
+  roles: { name: string; count: number; bytes: number }[];
+  /** Bytes gained over growthMinutes when the app keeps climbing, otherwise 0. */
+  growth: number;
+  growthMinutes: number;
+  path: Nullable<string>;
+  appId: Nullable<string>;
+  canClose: boolean;
+}
+
+export interface MemoryDetail {
+  installed: number;
+  reserved: number;
+  available: number;
+  appBytes: number;
+  compressed: number;
+  kernel: number;
+  graphics: number;
+  other: number;
+  cached: number;
+  free: number;
+  pressure: "fine" | "tight" | "low";
+  apps: MemoryApp[];
+}
+
+export interface StartupApp {
+  id: string;
+  name: string;
+  enabled: boolean;
+  running: boolean;
+  bytes: number;
 }
 
 export interface AppPower {
@@ -168,6 +209,7 @@ export interface Settings {
   alertsEnabled: boolean;
   cpuTempAlert: number;
   gpuTempAlert: number;
+  memoryAlert: number;
   alertSeconds: number;
   closeToTray: boolean;
   startWithWindows: boolean;

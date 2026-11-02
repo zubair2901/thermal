@@ -58,10 +58,16 @@ internal sealed class PowerModel
             {
                 // On hybrid-graphics laptops the dedicated GPU powers off unless something holds memory or work on it.
                 // Ignore token allocations (a few KB): apps like the NVIDIA overlay keep them even while the GPU sleeps.
-                var holders = procs.Where(p => p.Pid != _self && p.Name != "Thermal"
+                var holders = procs.Where(p => p.Pid != _self && p.Owner != "Thermal"
                                                && (p.VramByLuid.GetValueOrDefault(luid) > 1 << 20 || p.GpuByLuid.GetValueOrDefault(luid) > 0.5))
-                    .GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
-                    .Select(grp => (name: grp.Key, path: grp.Select(p => pathOf(p.Pid)).FirstOrDefault(x => x != null), pid: grp.First().Pid))
+                    .GroupBy(p => $"{p.Owner}|{p.OwnerPath}", StringComparer.OrdinalIgnoreCase)
+                    .Select(grp =>
+                    {
+                        // The app itself, not the browser-engine helper that happens to hold the GPU.
+                        var first = grp.First();
+                        var root = procs.FirstOrDefault(p => string.Equals(p.Name, first.Owner, StringComparison.OrdinalIgnoreCase) && string.Equals(p.OwnerPath, first.OwnerPath, StringComparison.OrdinalIgnoreCase)) ?? first;
+                        return (name: first.Owner, path: pathOf(root.Pid) ?? grp.Select(p => pathOf(p.Pid)).FirstOrDefault(x => x != null), pid: root.Pid);
+                    })
                     .ToList();
                 var userApps = holders.Where(h => !GpuPreference.IsSystem(h.name, h.path)).ToList();
                 onlyWindows = userApps.Count == 0 && holders.Count > 0;
@@ -86,18 +92,20 @@ internal sealed class PowerModel
         var gpuW = s.Gpus.Sum(g => g.Power ?? 0);
         double? rest = drain != null && cpuW != null ? Math.Max(0, drain.Value - cpuW.Value - gpuW) : null;
 
-        // Per app, grouped by executable name.
+        // Per app, counting embedded browser engines towards the app that started them.
         var apps = procs
-            .GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(p => $"{p.Owner}|{p.OwnerPath}", StringComparer.OrdinalIgnoreCase)
             .Select(grp =>
             {
-                var title = s.Processes.FirstOrDefault(x => x.Pid == grp.First().Pid)?.Title ?? "";
+                var name = grp.First().Owner;
+                var root = grp.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)) ?? grp.First();
+                var title = s.Processes.FirstOrDefault(x => x.Pid == root.Pid)?.Title ?? "";
                 var cpuShare = cpuSum > 0 ? grp.Sum(p => p.Cpu) / cpuSum : 0;
                 double? c = cpuW * cpuShare;
                 var gw = grp.Sum(p => gpuShares.GetValueOrDefault(p.Pid));
                 double? total = cpuW == null && gw == 0 ? null : (c ?? 0) + gw;
                 var share = (cpuShare * (cpuW ?? 1) + gw) / Math.Max(1e-6, (cpuW ?? 1) + gpuW);
-                return new AppPower(grp.Key, title, share, Round(total), Round(c), Round(gw), null);
+                return new AppPower(title == "" ? name : name + "|" + title, title, share, Round(total), Round(c), Round(gw), null);
             })
             .Where(a => a.Share > 0.001)
             .OrderByDescending(a => a.Watts ?? a.Share)
