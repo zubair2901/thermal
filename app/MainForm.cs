@@ -140,9 +140,18 @@ internal sealed class MainForm : Form
 
     private void RenderCore(Snapshot snap, List<(string title, string text)> alerts)
     {
+        // The five-minute charts need every second, including while the window is hidden, so keep slim copies here.
+        _recent.Enqueue(snap with { Processes = [], Sensors = [], Notes = [], Disks = [], Net = [], Power = null, MemoryDetail = null });
+        while (snap.T - _recent.Peek().T > 300_000) _recent.Dequeue();
         // Serialising ~500 processes every second is the main cost of the window; skip it while it's hidden.
         if (_ready && Visible && WindowState != FormWindowState.Minimized)
+        {
+            // Back on screen: first catch the charts up on what happened meanwhile.
+            if (_stale) Post(new { type = "backlog", snapshots = _recent.SkipLast(1) });
+            _stale = false;
             Post(new { type = "snapshot", snapshot = snap });
+        }
+        else _stale = true;
         if (_settings.OverlayEnabled) _overlay.Update(snap, _settings);
         _widget.Update(snap);
         var gpu = snap.Gpus.FirstOrDefault(g => g.Kind == "discrete") ?? snap.Gpus.FirstOrDefault();
@@ -150,6 +159,9 @@ internal sealed class MainForm : Form
         _tray.Record.Text = _recorder.Active ? "Stop recording" : "Start recording";
         foreach (var (title, text) in alerts) _tray.Notify(title, text);
     }
+
+    private readonly Queue<Snapshot> _recent = new();
+    private bool _stale = true;
 
     private static string Deg(double? t) => t == null ? "–" : $"{t:0} °C";
 
@@ -163,6 +175,7 @@ internal sealed class MainForm : Form
         {
             case "ready":
                 _ready = true;
+                _stale = true;
                 PostSettings();
                 break;
             case "settings":

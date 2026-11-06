@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { subscribe } from "./bridge";
+import { listen, subscribe } from "./bridge";
 import { shortGpu } from "./format";
 import type { Snapshot } from "./types";
 
@@ -32,37 +32,56 @@ const norms = {
   rpm: (v: number | null) => (v == null ? 0 : v / 6000),
 };
 
+function push(ser: Series, v: number | null) {
+  ser.values.push(v);
+  if (ser.values.length > WINDOW) ser.values.shift();
+}
+
+function add(hist: Map<string, Series>, s: Snapshot, lastT: number | null) {
+  // Seconds with no reading (screen off, sleep) stay empty instead of joining the readings either side.
+  const missing = lastT == null || s.t - lastT < 3000 ? 0 : Math.min(WINDOW, Math.round((s.t - lastT) / 1000) - 1);
+  for (const ser of hist.values()) for (let i = 0; i < missing; i++) push(ser, null);
+  const seen = new Set<string>();
+  for (const e of extract(s)) {
+    seen.add(e.key);
+    let ser = hist.get(e.key);
+    if (!ser) {
+      ser = { key: e.key, label: e.label, unit: e.unit, norm: norms[e.kind], values: [] };
+      hist.set(e.key, ser);
+    }
+    push(ser, e.v);
+  }
+  // Keep series that briefly vanish (a GPU powering down) aligned in time.
+  for (const [k, ser] of hist) if (!seen.has(k)) push(ser, null);
+}
+
 export function useTelemetry() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const hist = useRef(new Map<string, Series>());
+  const lastT = useRef<number | null>(null);
   const [, tick] = useState(0);
 
-  useEffect(
-    () =>
-      subscribe((s) => {
-        const seen = new Set<string>();
-        for (const e of extract(s)) {
-          seen.add(e.key);
-          let ser = hist.current.get(e.key);
-          if (!ser) {
-            ser = { key: e.key, label: e.label, unit: e.unit, norm: norms[e.kind], values: [] };
-            hist.current.set(e.key, ser);
-          }
-          ser.values.push(e.v);
-          if (ser.values.length > WINDOW) ser.values.shift();
-        }
-        // Keep series that briefly vanish (a GPU powering down) aligned in time.
-        for (const [k, ser] of hist.current) {
-          if (!seen.has(k)) {
-            ser.values.push(null);
-            if (ser.values.length > WINDOW) ser.values.shift();
-          }
-        }
-        setSnap(s);
-        tick((n) => n + 1);
-      }),
-    [],
-  );
+  useEffect(() => {
+    // The window only gets readings while it's on screen; on its return the host sends the seconds it missed.
+    const offBacklog = listen<{ snapshots: Snapshot[] }>("backlog", (d) => {
+      hist.current.clear();
+      lastT.current = null;
+      for (const s of d.snapshots) {
+        add(hist.current, s, lastT.current);
+        lastT.current = s.t;
+      }
+    });
+    const off = subscribe((s) => {
+      add(hist.current, s, lastT.current);
+      lastT.current = s.t;
+      setSnap(s);
+      tick((n) => n + 1);
+    });
+    return () => {
+      offBacklog();
+      off();
+    };
+  }, []);
 
   return { snap, history: hist.current };
 }
