@@ -38,7 +38,9 @@ Name: "{group}\Thermal"; Filename: "{app}\Thermal.exe"
 Name: "{autodesktop}\Thermal"; Filename: "{app}\Thermal.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\Thermal.exe"; Description: "Open Thermal"; Flags: nowait postinstall skipifsilent
+; Post-install entries run as the signed-in user without elevation by default, and Thermal requires it (error 740).
+; Setup is already elevated, so pass that on instead of asking again.
+Filename: "{app}\Thermal.exe"; Description: "Open Thermal"; Flags: nowait postinstall skipifsilent runascurrentuser
 
 [UninstallRun]
 ; Remove the "Start with Windows" logon task if the user turned it on.
