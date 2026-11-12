@@ -307,6 +307,11 @@ internal sealed class Collector : IDisposable
             var counterLoad = engines.Count > 0 ? engines.Values.Max() : 0;
 
             double? load = polled ? Val(s, SensorType.Load, "GPU Core") ?? Val(s, SensorType.Load, "D3D 3D") : null;
+            // CUDA and other compute work never shows in Windows' engine counters (an RTX 4060 lists no compute engine
+            // at all), so when the GPU's own load is well above what those counters explain, the busy engine is compute.
+            // Overall load is the busiest engine, the way Task Manager counts it, so compute gets the whole figure.
+            if (load >= 10 && load - counterLoad >= 20)
+                engineArr = engineArr.Prepend(new EngineLoad("Compute", Math.Round(load.Value, 1))).ToArray();
             load ??= counterLoad;
 
             var mem = _procs.AdapterMemory.GetValueOrDefault(a.Luid);
