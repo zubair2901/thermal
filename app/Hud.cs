@@ -145,16 +145,28 @@ internal abstract class LayeredWindow : Form
     }
 
     /// <summary>
-    /// Re-apply "always on top" only if something removed it. Windows keeps a topmost window above normal ones, and
-    /// reshuffling the z-order every second can get in the way of other apps coming to the front (e.g. from a notification).
+    /// Re-apply "always on top" only when it's needed: if something removed it, or if the window in front is above
+    /// this one. Many borderless games make themselves topmost, which puts them over every other topmost window.
+    /// Reshuffling the z-order every second regardless can get in the way of other apps coming to the front.
     /// </summary>
     public void KeepOnTop()
     {
-        if ((GetWindowLong(Handle, -20 /* GWL_EXSTYLE */) & 0x8 /* WS_EX_TOPMOST */) != 0) return;
+        var topmost = (GetWindowLong(Handle, -20 /* GWL_EXSTYLE */) & 0x8 /* WS_EX_TOPMOST */) != 0;
+        if (topmost && !IsAbove(GetForegroundWindow())) return;
         SetWindowPos(Handle, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0010 /* NOSIZE|NOMOVE|NOACTIVATE */);
     }
 
+    /// <summary>True if <paramref name="other"/> is higher in the z-order than this window.</summary>
+    private bool IsAbove(IntPtr other)
+    {
+        if (other == IntPtr.Zero || other == Handle) return false;
+        for (var h = GetWindow(Handle, 3 /* GW_HWNDPREV */); h != IntPtr.Zero; h = GetWindow(h, 3))
+            if (h == other) return true;
+        return false;
+    }
+
     [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hwnd, int index);
+    [DllImport("user32.dll")] private static extern IntPtr GetWindow(IntPtr hwnd, uint cmd);
 
     [StructLayout(LayoutKind.Sequential)] private struct POINT { public int X, Y; }
     [StructLayout(LayoutKind.Sequential)] private struct SIZE { public int cx, cy; }
